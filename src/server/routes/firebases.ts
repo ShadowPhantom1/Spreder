@@ -22,7 +22,7 @@ let _cache:any=null
 let _cacheTs=0
 function _invalidateCache(){ _cache=null; _cacheTs=0 }
 router.get('/', async (_req, res) => {
-  if(_cache && Date.now()-_cacheTs < 3000) return res.json(_cache)
+  if(_cache && Date.now()-_cacheTs < 10000) return res.json(_cache)
   const rows = await Firebase.find().sort({created_at:-1}).lean() as any[]
   const counts = await Device.aggregate([{$match:{status:'online'}}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[]
   const onlineMap = new Map<string, number>(counts.map((r:any)=>[r._id, r.c]))

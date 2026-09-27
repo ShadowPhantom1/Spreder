@@ -36,29 +36,35 @@ async function updateUserLock(id:string, ip:string, deviceId:string){
 }
 
 router.post('/login', async (req, res) => {
+  const t0 = Date.now()
   try{
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'username & password required' })
+  const t1 = Date.now()
   const user = await getUserByUsername(username) as any
+  const tFind = Date.now()-t1
   if (!user) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   if(user.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
   if(user.expires_at && new Date(user.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
   const deviceId = (req.headers['x-device-id'] as string) || req.headers['user-agent']?.slice(0,80) || 'web'
-  // FIRST LOGIN auto-lock: only device lock, IP system removed — kahi se bhi login
+  // verify password FIRST (fast fail, don't lock device on wrong pass)
+  const tB0 = Date.now()
+  const ok = await bcrypt.compare(password, user.password_hash)
+  const tB = Date.now()-tB0
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
+  // device binding check AFTER password success — IP system removed
   if(!user.allowed_device || user.allowed_device===''){
     if(user.is_super!==1){
-      await updateUserLock(user.id, ip, deviceId)
-      user.allowed_device = deviceId
-      console.log(`[Auth] First login device lock ${user.username} → Device ${deviceId.slice(0,20)}`)
+      // fire-and-forget lock to not block response, but also await with timeout 800ms
+      try{ await Promise.race([updateUserLock(user.id, ip, deviceId), new Promise((_,rej)=>setTimeout(()=>rej(new Error('lock timeout')),800))]); }catch{}
+      console.log(`[Auth] First login device lock ${user.username} → Device ${deviceId.slice(0,20)} (${Date.now()-t0}ms find:${tFind}ms bcrypt:${tB}ms)`)
     }
   } else {
     if(user.allowed_device && user.allowed_device!=='*' && user.allowed_device!==''){
       if(deviceId !== user.allowed_device) return res.status(403).json({ error: `Device not allowed` })
     }
   }
-  const ok = bcrypt.compareSync(password, user.password_hash)
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
   // respond first, sessions async (fire-and-forget) for speed
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })

@@ -35,39 +35,43 @@ app.use(express.urlencoded({ extended: true }))
 devicePoller.attachIO(io)
 queueService.setEmitter((event, payload) => io.emit(event, payload))
 
-// health & stats
+// health & stats — cached 5s for speed (was 2-3s per request, 8 DB ops)
+let _statsCache:any=null
+let _statsTs=0
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'BHNSTOCK SMS SPREADER 3D WEB', theme: 'Brand New Day', time: new Date().toISOString() }))
 
 app.get('/api/stats', async (_req, res) => {
+  if(_statsCache && Date.now()-_statsTs < 5000) return res.json(_statsCache)
   const {Firebase, Device, Campaign, CampaignMessage, Setting} = await import('./db/index.js')
-  const fbCount = await Firebase.countDocuments()
-  const devStatsAgg = await Device.aggregate([
-    {$group:{_id:null, total:{$sum:1}, online:{$sum:{$cond:[{$eq:['$status','online']},1,0]}}, offline:{$sum:{$cond:[{$eq:['$status','offline']},1,0]}}, busy:{$sum:{$cond:[{$eq:['$status','busy']},1,0]}}, rechargeOnline:{$sum:{$cond:[{$and:[{$eq:['$has_recharge',1]}, {$in:['$status',['online','busy']]}]},1,0]}}}}
-  ]) as any[]
-  const devStats = devStatsAgg[0] || {total:0, online:0, offline:0, busy:0, rechargeOnline:0}
-  const perSimDoc = await Setting.findOne({_id:'per_sim_limit'}).lean() as any || await Setting.findOne({_id:'max_sms_per_device_per_day'}).lean() as any
+  const istOffset = 5.5*60*60*1000
+  const istNow = new Date(Date.now() + istOffset)
+  istNow.setUTCHours(0,0,0,0)
+  const todayISO=new Date(istNow.getTime() - istOffset).toISOString()
+  // parallelize independent queries (was serial 3.5s → now ~1s)
+  const [fbCount, devStatsAgg, perSimDocRaw, checkRechargeDoc, devRows, todaySent, campStatsAgg] = await Promise.all([
+    Firebase.countDocuments(),
+    Device.aggregate([{$group:{_id:null, total:{$sum:1}, online:{$sum:{$cond:[{$eq:['$status','online']},1,0]}}, offline:{$sum:{$cond:[{$eq:['$status','offline']},1,0]}}, busy:{$sum:{$cond:[{$eq:['$status','busy']},1,0]}}, rechargeOnline:{$sum:{$cond:[{$and:[{$eq:['$has_recharge',1]}, {$in:['$status',['online','busy']]}]},1,0]}}}}]) as Promise<any[]>,
+    Setting.findOne({_id:'per_sim_limit'}).lean() as Promise<any>,
+    Setting.findOne({_id:'check_recharge'}).lean() as Promise<any>,
+    Device.find({status:{$in:['online','busy']}}).lean() as Promise<any[]>,
+    CampaignMessage.countDocuments({status:'sent', sent_at:{$gte:todayISO}}),
+    Campaign.aggregate([{$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]) as Promise<any[]>,
+  ])
+  const devStats = (devStatsAgg as any[])[0] || {total:0, online:0, offline:0, busy:0, rechargeOnline:0}
+  let perSimDoc = perSimDocRaw as any
+  if(!perSimDoc) perSimDoc = await Setting.findOne({_id:'max_sms_per_device_per_day'}).lean() as any
   const perSim = parseInt(perSimDoc?.value || '100',10)
-  const checkRechargeDoc = await Setting.findOne({_id:'check_recharge'}).lean() as any
-  const checkRecharge = (checkRechargeDoc?.value || 'true') !== 'false'
-  const devRows = await Device.find({status:{$in:['online','busy']}}).lean() as any[]
+  const checkRecharge = ((checkRechargeDoc as any)?.value || 'true') !== 'false'
   let totalCapacity=0
-  for(const d of devRows){
+  for(const d of (devRows as any[])){
     const sc=d.sim_count||1
     if(checkRecharge && d.has_recharge===0) continue
     if(sc===2 && checkRecharge && d.sim1_recharge===0 && d.sim2_recharge===0) continue
     if(sc===2 && checkRecharge && (d.sim1_recharge===0 || d.sim2_recharge===0)) totalCapacity+= perSim
     else totalCapacity+= sc * perSim
   }
-  const istOffset = 5.5*60*60*1000
-  const istNow = new Date(Date.now() + istOffset)
-  istNow.setUTCHours(0,0,0,0)
-  const todayISO=new Date(istNow.getTime() - istOffset).toISOString()
-  const todaySent = await CampaignMessage.countDocuments({status:'sent', sent_at:{$gte:todayISO}})
-  const remaining=Math.max(0, totalCapacity - todaySent)
-  const campStatsAgg = await Campaign.aggregate([
-    {$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}
-  ]) as any[]
-  const campStats = campStatsAgg[0] || {total:0, running:0, completed:0, draft:0, totalSent:0, totalFailed:0}
+  const remaining=Math.max(0, totalCapacity - (todaySent as number))
+  const campStats = (campStatsAgg as any[])[0] || {total:0, running:0, completed:0, draft:0, totalSent:0, totalFailed:0}
   const todayByDevice = await CampaignMessage.aggregate([
     {$match:{status:'sent', sent_at:{$gte:todayISO}}},
     {$group:{_id:'$device_id', c:{$sum:1}}},
@@ -77,8 +81,10 @@ app.get('/api/stats', async (_req, res) => {
     {$unwind:{path:'$dev', preserveNullAndEmptyArrays:true}},
     {$project:{device_id:'$_id', name:'$dev.name', c:1}}
   ]) as any[]
-  const totalToday = todaySent
-  res.json({ firebases: fbCount, devices: { ...devStats, capacity: { totalCapacity, remaining, perSim } }, campaigns: campStats, today: { totalToday, byDevice: todayByDevice, since: todayISO, capacity: { totalCapacity, remaining, perSim } } })
+  const totalToday = todaySent as number
+  const out = { firebases: fbCount, devices: { ...devStats, capacity: { totalCapacity, remaining, perSim } }, campaigns: campStats, today: { totalToday, byDevice: todayByDevice, since: todayISO, capacity: { totalCapacity, remaining, perSim } } }
+  _statsCache=out; _statsTs=Date.now()
+  res.json(out)
 })
 
 // Today stats dedicated — IST — FULLY MONGO

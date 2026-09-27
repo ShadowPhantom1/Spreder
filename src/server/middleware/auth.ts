@@ -9,6 +9,8 @@ export interface AuthedRequest extends Request {
 }
 
 const DISABLE_AUTH = process.env.DISABLE_AUTH === 'true'
+const _userCache = new Map<string,{u:any, exp:number}>()
+const _sessCache = new Map<string,{tok:string|null, exp:number}>()
 
 export async function authRequired(req: AuthedRequest, res: Response, next: NextFunction) {
   if (DISABLE_AUTH) {
@@ -19,13 +21,17 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
   if (!token) return res.status(401).json({ error: 'Unauthorized — thwip! Login required.' })
   try {
     const payload = jwt.verify(token, config.JWT_SECRET) as any
-    let u:any
-    if(useMongo){
-      const User=mongoose.model('User')
-      const d=await User.findOne({_id:payload.id}).lean() as any
-      if(d) u={...d, id:d._id}
-    } else {
-      u = db.prepare('SELECT id, username, role, is_active, is_super, allowed_device, expires_at FROM users WHERE id=?').get(payload.id) as any
+    const cacheKey = payload.id
+    let u:any = _userCache.get(cacheKey)?.u
+    if(!u || Date.now() > (_userCache.get(cacheKey)?.exp||0)){
+      if(useMongo){
+        const User=mongoose.model('User')
+        const d=await User.findOne({_id:payload.id}).lean() as any
+        if(d) u={...d, id:d._id}
+      } else {
+        u = db.prepare('SELECT id, username, role, is_active, is_super, allowed_device, expires_at FROM users WHERE id=?').get(payload.id) as any
+      }
+      if(u) _userCache.set(cacheKey,{u, exp:Date.now()+10000})
     }
     if(!u) return res.status(401).json({ error: 'User not found' })
     if(u.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
@@ -35,14 +41,21 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     if(u.allowed_device && u.allowed_device!=='*' && u.allowed_device!==''){
       if(devId !== u.allowed_device) return res.status(403).json({ error: 'Device not allowed — first device only' })
     }
-    // FULLY MONGO sessions — also keep sqlite dummy for legacy
-    try{
-      const {Session} = await import('../db/index.js')
-      const sess:any = await Session.findOne({_id: payload.id} as any).lean() || await Session.findOne({user_id: payload.id}).lean()
-      if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
-    }catch{
-      const sess = db.prepare('SELECT token FROM sessions WHERE user_id=?').get(payload.id) as any
-      if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+    // FULLY MONGO sessions — cached 10s to avoid DB hit on every poll (firebases 7s)
+    const sessCache = _sessCache.get(cacheKey)
+    if(!sessCache || Date.now() > sessCache.exp){
+      try{
+        const {Session} = await import('../db/index.js')
+        const sess:any = await Session.findOne({_id: payload.id} as any).lean() || await Session.findOne({user_id: payload.id}).lean()
+        _sessCache.set(cacheKey,{tok: sess?.token||null, exp:Date.now()+10000})
+        if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+      }catch{
+        const sess = db.prepare('SELECT token FROM sessions WHERE user_id=?').get(payload.id) as any
+        _sessCache.set(cacheKey,{tok: sess?.token||null, exp:Date.now()+10000})
+        if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+      }
+    } else {
+      if(sessCache.tok && sessCache.tok !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
     }
     req.user = { ...payload, is_super: u.is_super, allowed_device: u.allowed_device } as any
     next()

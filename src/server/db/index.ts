@@ -65,9 +65,9 @@ if (!adminExists) {
   console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
 }
 
-// default settings into Mongo
+// default settings into Mongo — poll 5s (was 500ms hammering Atlas)
 const defaults: Record<string,string> = {
-  poll_interval_ms: '500',
+  poll_interval_ms: '5000',
   dispatch_batch_size: '50',
   dispatch_delay_ms: '0',
   ack_timeout_ms: '1200',
