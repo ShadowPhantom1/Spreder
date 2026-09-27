@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { Shield, Trash2, Power, UserPlus, Save, Ban, Search, Users, Lock, Smartphone, LogOut, Eye } from 'lucide-react'
+import { Shield, Trash2, Power, UserPlus, Ban, Search, Users, Lock, Smartphone, LogOut, Eye } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function UsersPage(){
@@ -54,74 +54,72 @@ export default function UsersPage(){
   })
 
   return (
-    <div className="space-y-4">
-      {msg && <div className="px-4 py-3 rounded-2xl bg-white border border-[#BFDBFF] shadow-sm flex items-center gap-2 text-sm"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>{msg} <button onClick={()=>setMsg('')} className="ml-auto text-zinc-400">✕</button></div>}
+    <div className="space-y-5">
+      {msg && <div className="px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center gap-2 text-sm text-slate-700"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>{msg} <button onClick={()=>setMsg('')} className="ml-auto text-slate-400 hover:text-slate-600">✕</button></div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-black text-lg flex items-center gap-2"><Users size={18} className="text-[#0066CC]"/> User Management <span className="px-2.5 py-1 rounded-full bg-[#0066CC] text-white text-xs font-black">{filtered.length}</span></h2>
-          <p className="text-xs text-zinc-500">Add via popup • Device lock on first login • 1 ID 1 device • Super only • /adminbhnstock</p>
+          <h2 className="font-black text-lg text-slate-900 flex items-center gap-2"><Users size={18} className="text-slate-700"/> User Management <span className="px-2.5 py-1 rounded-full bg-slate-900 text-white text-xs font-bold">{filtered.length}</span></h2>
+          <p className="text-xs text-slate-500 mt-1">Add via popup • Device lock on first login • 1 ID 1 device</p>
         </div>
-        <button onClick={()=>setShowAdd(true)} className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#E30613] to-[#9A0007] text-white font-black flex items-center gap-2 shadow-[0_8px_22px_rgba(227,6,19,0.35)] hover:shadow-xl"><UserPlus size={18}/> Add User</button>
+        <button onClick={()=>setShowAdd(true)} className="px-5 py-3 rounded-xl bg-slate-900 text-white font-bold flex items-center gap-2 hover:bg-black shadow"><UserPlus size={18}/> Add User</button>
       </div>
 
-      <div className="rounded-[20px] bg-white border border-[#EAF4FF] shadow-sm p-4">
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex gap-1 p-1 rounded-full bg-[#F0F7FF] border border-[#EAF4FF]">
+          <div className="flex gap-1 p-1 rounded-full bg-slate-100 border border-slate-200">
             {['all','active','disabled','super'].map(f=>(
-              <button key={f} onClick={()=>setFilter(f as any)} className={`px-4 py-1.5 rounded-full text-xs font-black capitalize ${filter===f?'bg-[#E30613] text-white shadow':'text-zinc-600 hover:bg-white'}`}>{f}</button>
+              <button key={f} onClick={()=>setFilter(f as any)} className={`px-4 py-1.5 rounded-full text-xs font-bold capitalize ${filter===f?'bg-slate-900 text-white':'text-slate-600 hover:bg-white'}`}>{f}</button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-              <input placeholder="Search username" value={q} onChange={e=>setQ(e.target.value)} className="pl-9 pr-3 py-2.5 rounded-full bg-[#F8FBFF] border border-[#EAF4FF] focus:border-[#0066CC] outline-none text-sm w-64"/>
-            </div>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+            <input placeholder="Search username" value={q} onChange={e=>setQ(e.target.value)} className="pl-9 pr-3 py-2.5 rounded-full bg-white border border-slate-300 focus:border-slate-900 outline-none text-sm w-64 text-slate-900 placeholder:text-slate-400"/>
           </div>
         </div>
 
-        <div className="overflow-x-auto mt-4 rounded-2xl border border-[#F0F7FF]">
+        <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200">
           <table className="w-full text-sm">
-            <thead className="bg-[#F0F7FF] text-[#0A1628] text-xs font-black tracking-widest">
-              <tr><th className="text-left p-3.5">USER</th><th className="p-3.5 text-left">DEVICE LOCK</th><th className="p-3.5">LIMIT</th><th className="p-3.5">EXPIRY</th><th className="p-3.5">STATUS</th><th className="p-3.5">SESSION</th><th className="p-3.5 text-right">ACTIONS</th></tr>
+            <thead className="bg-slate-50 text-slate-600 text-xs font-bold tracking-widest">
+              <tr><th className="text-left p-3">USER</th><th className="p-3 text-left">DEVICE LOCK</th><th className="p-3">LIMIT</th><th className="p-3">EXPIRY</th><th className="p-3">STATUS</th><th className="p-3">SESSION</th><th className="p-3 text-right">ACTIONS</th></tr>
             </thead>
             <tbody>
               {filtered.map((u:any)=>(
-                <tr key={u.id} className="border-t border-[#F8FBFF] hover:bg-[#F8FBFF]">
+                <tr key={u.id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="p-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0066CC] to-[#1E40AF] text-white grid place-items-center font-black">{u.username[0].toUpperCase()}</div>
-                      <div><div className="font-black flex items-center gap-1.5">{u.username} {u.is_super && <span className="px-2 py-0.5 rounded-full bg-[#0066CC] text-white text-[10px] font-black">SUPER</span>}</div><div className="text-xs text-zinc-500 font-mono">{u.id.slice(0,8)} • {new Date(u.created_at).toLocaleDateString()}</div></div>
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-white grid place-items-center font-black text-sm">{u.username[0].toUpperCase()}</div>
+                      <div><div className="font-bold text-slate-900 flex items-center gap-1.5">{u.username} {u.is_super && <span className="px-2 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold">SUPER</span>}</div><div className="text-xs text-slate-500">{u.id.slice(0,8)} • {new Date(u.created_at).toLocaleDateString()}</div></div>
                     </div>
                   </td>
                   <td className="p-3">
-                    <div className="text-[11px] text-zinc-500 flex items-center gap-1"><Lock size={10}/>{u.allowed_device?u.allowed_device.slice(0,24):'— first login lock —'}</div>
-                    <div className="text-xs font-mono text-zinc-600">{u.allowed_device ? '1 device only' : 'any device (not yet locked)'}</div>
+                    <div className="text-xs text-slate-600 flex items-center gap-1"><Lock size={12} className="text-slate-400"/>{u.allowed_device?u.allowed_device.slice(0,22):'— first login lock —'}</div>
+                    <div className="text-xs text-slate-500">{u.allowed_device ? '1 device only' : 'any device (not yet locked)'}</div>
                   </td>
                   <td className="p-3">
                     {editing===u.id ? (
-                      <input type="number" defaultValue={u.per_sim_limit} id={`per-${u.id}`} className="w-20 px-2 py-1.5 rounded-xl bg-white border-2 border-[#0066CC] text-xs text-center font-black"/>
+                      <input type="number" defaultValue={u.per_sim_limit} id={`per-${u.id}`} className="w-20 px-2 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-center font-bold text-slate-900"/>
                     ) : (
-                      <div onClick={()=>setEditing(u.id)} className="cursor-pointer font-black text-center px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">{u.per_sim_limit}<span className="font-normal text-xs">/SIM</span></div>
+                      <div onClick={()=>setEditing(u.id)} className="cursor-pointer font-bold text-center px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 hover:bg-slate-200">{u.per_sim_limit}<span className="font-normal text-xs">/SIM</span></div>
                     )}
-                    <div className="text-[11px] text-center text-zinc-500">max {u.max_devices}</div>
+                    <div className="text-[11px] text-center text-slate-500">max {u.max_devices}</div>
                   </td>
-                  <td className="p-3 text-center text-xs font-bold">{u.expires_at? new Date(u.expires_at).toLocaleDateString(): <span className="text-zinc-400">∞</span>}</td>
-                  <td className="p-3 text-center">{u.is_active? <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black border border-emerald-200">ACTIVE</span>: <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-black">DISABLED</span>}</td>
-                  <td className="p-3 text-center text-xs">{u.session? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0066CC] text-white font-mono"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>{u.session.ip.slice(0,12)}</span>: <span className="text-zinc-300">—</span>}</td>
+                  <td className="p-3 text-center text-xs font-semibold text-slate-700">{u.expires_at? new Date(u.expires_at).toLocaleDateString(): <span className="text-slate-400">∞</span>}</td>
+                  <td className="p-3 text-center">{u.is_active? <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">ACTIVE</span>: <span className="px-3 py-1 rounded-full bg-red-50 text-red-700 text-xs font-bold border border-red-200">DISABLED</span>}</td>
+                  <td className="p-3 text-center text-xs">{u.session? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 text-white font-mono text-xs"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>{u.session.ip?.slice(0,12) || 'online'}</span>: <span className="text-slate-400">—</span>}</td>
                   <td className="p-3">
                     <div className="flex justify-end gap-1">
                       {editing===u.id ? (
                         <>
-                          <button onClick={()=>{ const per=parseInt((document.getElementById(`per-${u.id}`) as HTMLInputElement).value||'100'); save(u.id, per)}} className="px-3 py-1.5 rounded-xl bg-[#0066CC] text-white font-black text-xs">Save</button>
-                          <button onClick={()=>setEditing(null)} className="px-3 py-1.5 rounded-xl bg-zinc-100 font-bold text-xs">Cancel</button>
+                          <button onClick={()=>{ const per=parseInt((document.getElementById(`per-${u.id}`) as HTMLInputElement).value||'100'); save(u.id, per)}} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs">Save</button>
+                          <button onClick={()=>setEditing(null)} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-bold text-xs text-slate-700">Cancel</button>
                         </>
                       ) : (
                         <>
-                          <button onClick={()=>setEditing(u.id)} className="p-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0066CC] hover:text-white text-[#0066CC]"><Eye size={14}/></button>
-                          {u.is_active? <button onClick={()=>act('disable',u.id)} className="p-2 rounded-xl bg-amber-100 hover:bg-amber-500 hover:text-white text-amber-700"><Ban size={14}/></button>: <button onClick={()=>act('enable',u.id)} className="p-2 rounded-xl bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700"><Power size={14}/></button>}
-                          <button onClick={()=>act('kick',u.id)} className="p-2 rounded-xl bg-zinc-800 hover:bg-black text-white"><LogOut size={14}/></button>
-                          <button onClick={async()=>{ if(confirm('Revoke Device? Next login new device lock.')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="px-2.5 py-2 rounded-xl bg-[#0066CC] text-white font-black text-xs">Revoke</button>
-                          <button onClick={()=>del(u.id)} className="p-2 rounded-xl bg-red-50 hover:bg-red-600 hover:text-white text-red-600"><Trash2 size={14}/></button>
+                          <button onClick={()=>setEditing(u.id)} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"><Eye size={14}/></button>
+                          {u.is_active? <button onClick={()=>act('disable',u.id)} className="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"><Ban size={14}/></button>: <button onClick={()=>act('enable',u.id)} className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"><Power size={14}/></button>}
+                          <button onClick={()=>act('kick',u.id)} className="p-2 rounded-lg bg-slate-900 hover:bg-black text-white"><LogOut size={14}/></button>
+                          <button onClick={async()=>{ if(confirm('Revoke Device? Next login new device lock.')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="px-2.5 py-2 rounded-lg bg-slate-900 text-white font-bold text-xs">Revoke</button>
+                          <button onClick={()=>del(u.id)} className="p-2 rounded-lg bg-white hover:bg-red-50 text-red-600 border border-slate-200"><Trash2 size={14}/></button>
                         </>
                       )}
                     </div>
@@ -130,49 +128,48 @@ export default function UsersPage(){
               ))}
             </tbody>
           </table>
-          {filtered.length===0 && <div className="p-10 text-center text-zinc-400">No users found</div>}
+          {filtered.length===0 && <div className="p-10 text-center text-slate-400 text-sm">No users found</div>}
         </div>
       </div>
 
       <AnimatePresence>
         {showAdd && (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div onClick={()=>setShowAdd(false)} className="absolute inset-0 bg-[#0A1628]/60 backdrop-blur-md"/>
-            <motion.div initial={{scale:0.92, y:20, opacity:0}} animate={{scale:1, y:0, opacity:1}} exit={{scale:0.92, opacity:0}} className="relative w-full max-w-[480px] rounded-[24px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/50 overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-[#E30613] via-[#FFD23F] to-[#0066CC]"/>
+            <div onClick={()=>setShowAdd(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"/>
+            <motion.div initial={{scale:0.96, y:12, opacity:0}} animate={{scale:1, y:0, opacity:1}} exit={{scale:0.96, opacity:0}} className="relative w-full max-w-[480px] rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#E30613] to-[#9A0007] grid place-items-center text-white"><UserPlus size={18}/></div>
-                    <div><h2 className="font-black text-lg leading-none">New User</h2><p className="text-xs text-zinc-500">Add to MongoDB • device lock on first login</p></div>
+                    <div className="w-10 h-10 rounded-xl bg-slate-900 grid place-items-center text-white"><UserPlus size={18}/></div>
+                    <div><h2 className="font-bold text-base text-slate-900 leading-none">New User</h2><p className="text-xs text-slate-500">Add to MongoDB • device lock on first login</p></div>
                   </div>
-                  <button onClick={()=>setShowAdd(false)} className="w-9 h-9 rounded-full bg-[#F0F7FF] grid place-items-center hover:bg-zinc-100">✕</button>
+                  <button onClick={()=>setShowAdd(false)} className="w-9 h-9 rounded-full bg-slate-100 grid place-items-center hover:bg-slate-200 text-slate-600">✕</button>
                 </div>
                 <div className="mt-5 space-y-4">
                   <label className="block">
-                    <span className="text-xs font-black tracking-widest text-zinc-600">USERNAME</span>
-                    <input autoFocus placeholder="e.g. rahul123" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm font-bold text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
+                    <span className="text-xs font-bold tracking-widest text-slate-700">USERNAME</span>
+                    <input autoFocus placeholder="e.g. rahul123" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-xl bg-white border border-slate-300 focus:border-slate-900 outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400"/>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-black tracking-widest text-zinc-600">PASSWORD</span>
-                    <input placeholder="•••••••• (min 6)" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
+                    <span className="text-xs font-bold tracking-widest text-slate-700">PASSWORD</span>
+                    <input placeholder="•••••••• (min 6)" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-xl bg-white border border-slate-300 focus:border-slate-900 outline-none text-sm text-slate-900 placeholder:text-slate-400"/>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-black tracking-widest text-zinc-600">SUBSCRIPTION DAYS <span className="font-normal text-zinc-400 normal-case">— kitne din?</span></span>
-                    <input placeholder="30" type="number" value={form.sub_days} onChange={e=>setForm({...form, sub_days:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm font-black text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
-                    <div className="text-[11px] text-zinc-500 mt-1"><span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">0 = Lifetime</span> <span className="px-2 py-0.5 rounded-full bg-[#EAF4FF] font-bold">30 = 30 din</span></div>
+                    <span className="text-xs font-bold tracking-widest text-slate-700">SUBSCRIPTION DAYS <span className="font-normal text-slate-500 normal-case">— kitne din?</span></span>
+                    <input placeholder="30" type="number" value={form.sub_days} onChange={e=>setForm({...form, sub_days:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-xl bg-white border border-slate-300 focus:border-slate-900 outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"/>
+                    <div className="text-[11px] text-slate-500 mt-1"><span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">0 = Lifetime</span> <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 font-bold ml-1">30 = 30 din</span></div>
                   </label>
                 </div>
-                {formError && <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 font-bold">⚠️ {formError}</div>}
-                <div className="mt-4 p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 flex gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white grid place-items-center shrink-0"><Lock size={14}/></div>
-                  <div className="text-xs leading-relaxed"><b>Device lock:</b> User pehli baar login karega → device auto-save → 1 ID 2 device block. <b>Revoke</b> se naya device.</div>
+                {formError && <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">⚠️ {formError}</div>}
+                <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-white grid place-items-center shrink-0"><Lock size={14}/></div>
+                  <div className="text-xs leading-relaxed text-slate-600"><b className="text-slate-900">Device lock:</b> First login → device auto-save → 1 ID 2 device block. <b>Revoke</b> se naya device.</div>
                 </div>
                 <div className="flex gap-3 mt-6">
-                  <button onClick={()=>setShowAdd(false)} className="flex-1 py-3 rounded-2xl bg-[#F0F7FF] border border-[#EAF4FF] font-black">Cancel</button>
-                  <button onClick={create} disabled={creating} className={`flex-1 py-3 rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 ${creating?'bg-zinc-300 text-zinc-600':'bg-gradient-to-r from-[#E30613] to-[#9A0007] text-white shadow-[0_8px_20px_rgba(227,6,19,0.35)]'}`}>{creating?'Creating…':'Create User'}</button>
+                  <button onClick={()=>setShowAdd(false)} className="flex-1 py-3 rounded-xl bg-white border border-slate-200 font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                  <button onClick={create} disabled={creating} className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${creating?'bg-slate-200 text-slate-500':'bg-slate-900 text-white hover:bg-black'}`}>{creating?'Creating…':'Create User'}</button>
                 </div>
-                <div className="text-center text-[11px] text-zinc-400 mt-3">Stored in <b>MongoDB Cluster0</b> • persists after Render restart</div>
+                <div className="text-center text-[11px] text-slate-400 mt-3">Stored in <b className="text-slate-600">MongoDB Cluster0</b> • persists after restart</div>
               </div>
             </motion.div>
           </motion.div>
