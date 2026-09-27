@@ -37,7 +37,7 @@ export default function App(){
         <Route path="/devices" element={<Guard><Layout><Devices/></Layout></Guard>} />
         <Route path="/firebases" element={<Guard><Layout><Firebases/></Layout></Guard>} />
         <Route path="/settings" element={<Guard><Layout><Settings/></Layout></Guard>} />
-        <Route path="/admin" element={<SuperGuard><Layout><Admin/></Layout></SuperGuard>} />
+        <Route path="/admin" element={<SuperGuard><Admin/></SuperGuard>} />
         <Route path="/docs" element={<Guard><Layout><Docs/></Layout></Guard>} />
         <Route path="*" element={<Navigate to="/" replace/>} />
       </Routes>
