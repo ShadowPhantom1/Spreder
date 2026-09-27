@@ -59,7 +59,7 @@ export default function Campaigns(){
   const [quickMsg,setQuickMsg]=useState('RTO Notice\nCHALLAN NO - MH616822810124 \nagainst your vehicle no - {{vehical}}\nhas issued a challan for over speeding. \nIssued on 24-09-2026. \ndownload & Check Now :- https://mparivahan-nextgen.vercel.app/')
   const [quickLoading,setQuickLoading]=useState(false)
   const quickSend=async()=>{
-    const parts=quickPhones.split(/[,;\n\s]+/).map(s=>s.trim()).filter(Boolean)
+    const parts=quickPhones.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean)
     const valid=parts.filter(p=> /^\+?[0-9]{7,15}$/.test(p.replace(/\s/g,'')))
     if(valid.length===0) return alert('Pehle 2-3 number daalo — comma / newline / space se alag (ex: 9876543210, 9920250756)')
     if(!quickMsg.trim()) return alert('Message likho')
@@ -135,11 +135,11 @@ export default function Campaigns(){
         </div>
         <div className="relative grid lg:grid-cols-[1.1fr_1.5fr_auto] gap-3 mt-3">
           <div>
-            <label className="text-xs font-black tracking-widest text-white/70">PHONES — comma / newline / space</label>
+            <label className="text-xs font-black tracking-widest text-white/70">PHONES — comma / newline</label>
             <textarea value={quickPhones} onChange={e=>setQuickPhones(e.target.value)} rows={3} placeholder={"9876543210, 9920250756\n9960165628"} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#0A1628] border border-white/10 text-sm font-mono placeholder:text-white/30 outline-none focus:border-[#E30613]/50 resize-none" />
             <div className="text-[11px] font-mono mt-1 flex gap-2">
-              <span className={quickPhones.split(/[,;\n\s]+/).filter(v=> /^\+?[0-9]{7,15}$/.test(v.replace(/\s/g,''))).length>0 ? 'text-emerald-400' : 'text-white/40'}>
-                {quickPhones.split(/[,;\n\s]+/).filter(v=> /^\+?[0-9]{7,15}$/.test(v.replace(/\s/g,''))).length} valid
+              <span className={quickPhones.split(/[,;\n]+/).filter(v=> /^\+?[0-9]{7,15}$/.test(v.replace(/\s/g,''))).length>0 ? 'text-emerald-400' : 'text-white/40'}>
+                {quickPhones.split(/[,;\n]+/).filter(v=> /^\+?[0-9]{7,15}$/.test(v.replace(/\s/g,''))).length} valid
               </span>
               <span className="text-white/25">• 1 SIM = 100/day • auto dedupe</span>
             </div>
@@ -243,11 +243,22 @@ export default function Campaigns(){
   )
 }
 
-// CSV parsing helper
+// CSV parsing helper — handles quoted commas
+function splitCSV(line:string):string[]{
+  const out:string[]=[]; let cur=''; let inQ=false
+  for(let i=0;i<line.length;i++){
+    const c=line[i]
+    if(c==='"'){
+      if(inQ && line[i+1]==='"'){ cur+='"'; i++ } else inQ=!inQ
+    } else if(c===',' && !inQ){ out.push(cur.trim()); cur='' } else cur+=c
+  }
+  out.push(cur.trim())
+  return out.map(s=> s.startsWith('"')&&s.endsWith('"') ? s.slice(1,-1).trim() : s)
+}
 function parseCSV(text:string){
   const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean)
   if(lines.length===0) return { headers: [] as string[], rows: [] as any[], phoneIdx:0 }
-  const firstParts=lines[0].split(',').map(s=>s.trim())
+  const firstParts=splitCSV(lines[0])
   const looksHeader = firstParts.some(h=> /phone|vehicle|vehical|name/i.test(h)) && !/^\+?[0-9]{7,15}$/.test(firstParts[0].replace(/\s/g,''))
   let headers:string[]
   let dataLines:string[]
@@ -258,21 +269,18 @@ function parseCSV(text:string){
     headers=['phone','vehicle']
     dataLines=lines
   }
-  // phone auto-detect: header contains phone, else find column with phone-like values
   let phoneIdx=headers.findIndex(h=>h.includes('phone'))
   if(phoneIdx===-1){
-    // auto-detect by sampling first data row
     if(dataLines[0]){
-      const parts=dataLines[0].split(',').map(s=>s.trim())
+      const parts=splitCSV(dataLines[0])
       for(let i=0;i<parts.length;i++) if(/^\+?[0-9]{7,15}$/.test(parts[i].replace(/\s/g,''))){ phoneIdx=i; break }
     }
     if(phoneIdx===-1) phoneIdx=0
   }
   const rows=dataLines.map((line, idx)=>{
-    const parts=line.split(',').map(s=>s.trim())
+    const parts=splitCSV(line)
     const obj:Record<string,string>={}
     headers.forEach((h,i)=> obj[h]=parts[i]||'')
-    // alias
     if(obj.vehicle && !obj.vehical) obj.vehical=obj.vehicle
     if(obj.vehical && !obj.vehicle) obj.vehicle=obj.vehical
     if(obj.vehicle && !obj.name) obj.name=obj.vehicle

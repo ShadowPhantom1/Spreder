@@ -42,7 +42,7 @@ export default function Settings(){
   const webhookFields=[
     { key:'webhook_url', label:'Webhook URL (on campaign completed)', icon: Radio, hint:'e.g., https://your-app.com/api/hook — JSON POST hoga', type:'text' },
     { key:'webhook_enabled', label:'Webhook Enabled?', icon: Zap, hint:'true = campaign completed pe auto POST, false = off', type:'select', opts:['true','false'] },
-    { key:'webhook_secret', label:'Webhook Secret', icon: Shield, hint:'Optional — header X-Webhook-Secret me jayega', type:'text' },
+    { key:'webhook_secret', label:'Webhook Secret', icon: Shield, hint:'Optional — header X-Webhook-Secret me jayega', type:'password' },
   ]
   const mast=[
     { key:'max_sms_per_device_per_day', label:'MAX SMS / SIM / Day', icon: Shield, hint:'1 SIM = 100 SMS/day default — daily limit, auto-skip if hit', type:'number' },
@@ -179,7 +179,7 @@ export default function Settings(){
                     {((f as any).opts as string[]).map((o:string)=><option key={o} value={o}>{o}</option>)}
                   </select>
                 ) : (
-                  <input value={form[f.key] || ''} onChange={e=>setForm({...form,[f.key]:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-[#0A1628] border border-white/10 outline-none focus:border-[#00D9FF]/50 text-sm font-mono" placeholder={f.key==='webhook_url'?'https://...':f.key} />
+                  <input type={(f as any).type==='password'?'password':'text'} value={form[f.key] || ''} onChange={e=>setForm({...form,[f.key]:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-[#0A1628] border border-white/10 outline-none focus:border-[#00D9FF]/50 text-sm font-mono" placeholder={f.key==='webhook_url'?'https://...':f.key==='webhook_secret'?'••••••••':f.key} />
                 )}
                 <span className="text-[11px] font-mono text-white/40 mt-1 block">{f.hint}</span>
               </label>
@@ -224,10 +224,10 @@ export default function Settings(){
 
       <div className="rounded-[22px] comic-border bg-[#0A1628] p-6 border border-white/10">
         <div className="text-xs font-black tracking-[0.16em] text-white/60">RAW SETTINGS — EXPORT</div>
-        <pre className="mt-3 p-4 rounded-2xl bg-black/40 border border-white/10 text-xs font-mono text-white/80 overflow-auto">{JSON.stringify(form, null, 2)}</pre>
+        <pre className="mt-3 p-4 rounded-2xl bg-black/40 border border-white/10 text-xs font-mono text-white/80 overflow-auto">{JSON.stringify({...form, webhook_secret: form.webhook_secret ? '••••••••' : ''}, null, 2)}</pre>
         <div className="mt-3 flex gap-2">
           <button onClick={async()=>{ if(!confirm('Cleanup old completed campaigns?')) return; const r=await api.post('/api/campaigns/cleanup',{}); alert(`Deleted ${r.deleted} old campaigns`); }} className="px-4 py-2 rounded-full bg-white/10 border border-white/15 text-xs font-bold flex items-center gap-1"><Trash2 size={12}/> RUN CLEANUP NOW</button>
-          <button onClick={()=>navigator.clipboard.writeText(JSON.stringify(form,null,2))} className="px-4 py-2 rounded-full bg-white text-[#0A1628] text-xs font-black">COPY JSON</button>
+          <button onClick={()=>{ const masked={...form, webhook_secret: form.webhook_secret ? '••••••••' : ''}; navigator.clipboard.writeText(JSON.stringify(masked,null,2))}} className="px-4 py-2 rounded-full bg-white text-[#0A1628] text-xs font-black">COPY JSON</button>
         </div>
       </div>
     </div>

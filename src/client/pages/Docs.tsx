@@ -249,7 +249,7 @@ upsert ON CONFLICT, emit devices:update, firebases:update, stats:devices`}</pre>
             <h2 className="font-display text-2xl flex items-center gap-2"><Rocket size={18} className="text-emerald-400"/> 13 — DEPLOY</h2>
             <pre className="mt-3 p-3 rounded-xl bg-black/40 border border-white/10 text-xs font-mono overflow-auto">{`PORT=3000
 JWT_SECRET=32+ chars
-ADMIN_USER=admin ADMIN_PASS=admin123456
+ADMIN_USER=admin ADMIN_PASS=••••••••
 DATABASE_PATH=./data/sms.db
 npm run build && npm start → serves API + static + Socket.io`}</pre>
             <div className="mt-3 flex gap-2">

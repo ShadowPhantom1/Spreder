@@ -7,16 +7,17 @@ export default function Devices(){
   const [devices,setDevices]=useState<any[]>([])
   const [loading,setLoading]=useState(false)
   const [showList,setShowList]=useState(false)
+  const [q,setQ]=useState('')
 
   const load=async()=>{
     setLoading(true)
     try{
-      const [s,d]=await Promise.all([ api.get('/api/stats'), api.get('/api/devices?limit=1000') ])
+      const [s,d]=await Promise.all([ api.get('/api/stats'), api.get('/api/devices?limit=200') ])
       setStats(s)
       setDevices(d)
     }catch{} finally{ setLoading(false)}
   }
-  useEffect(()=>{ load(); const id=setInterval(load,4000); return()=>clearInterval(id)},[])
+  useEffect(()=>{ load(); const id=setInterval(load,5000); return()=>clearInterval(id)},[])
 
   const total = stats?.devices?.total ?? 0
   const online = stats?.devices?.online ?? 0
@@ -31,6 +32,7 @@ export default function Devices(){
 
   // only online + recharge are actually used for sending
   const pool = devices.filter(d=> d.has_recharge!==0)
+  const filteredPool = q ? pool.filter((d:any)=> (d.name||'').toLowerCase().includes(q.toLowerCase()) || (d.id||'').toLowerCase().includes(q.toLowerCase())) : pool
 
   return (
     <div className="space-y-8">
@@ -123,13 +125,19 @@ export default function Devices(){
       {/* ONLINE POOL — compact pills, not table */}
       {showList && (
         <div className="rounded-[28px] comic-border bg-[#0F2340] border border-white/10 p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-xl flex items-center gap-2"><Smartphone size={18} className="text-emerald-400"/> ONLINE POOL — SIRF BHEJNE LAYAK ({pool.length})</h3>
-            <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300">LIVE</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-display text-xl flex items-center gap-2"><Smartphone size={18} className="text-emerald-400"/> ONLINE POOL — SIRF BHEJNE LAYAK ({filteredPool.length}/{pool.length})</h3>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search name or ID" className="pl-8 pr-3 py-1.5 rounded-full bg-[#0A1628] border border-white/10 text-xs w-44 outline-none focus:border-[#E30613]/50 placeholder:text-white/30" />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30">🔍</span>
+              </div>
+              <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300">LIVE</span>
+            </div>
           </div>
-          <p className="text-xs font-mono text-white/40 mt-1">Offline wale yaha nahi — sirf count me. Har pill = 1 SIM (100/day). Dual wale 2×.</p>
+          <p className="text-xs font-mono text-white/40 mt-1">Offline wale yaha nahi — sirf count me. Har pill = 1 SIM (100/day). Dual wale 2×. Limit 200 fetch — search se filter karo.</p>
           <div className="mt-4 flex flex-wrap gap-2 max-h-[320px] overflow-auto">
-            {pool.slice(0,120).map((d:any)=>(
+            {filteredPool.slice(0,100).map((d:any)=>(
               <div key={d.id} className="px-3 py-2 rounded-full bg-white text-[#0A1628] text-xs font-bold flex items-center gap-2 border-2 border-white shadow">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 {d.name}
@@ -138,7 +146,8 @@ export default function Devices(){
               </div>
             ))}
           </div>
-          {pool.length>120 && <div className="text-xs font-mono text-white/40 mt-3">+{pool.length-120} aur online — sab count me included</div>}
+          {filteredPool.length>100 && <div className="text-xs font-mono text-white/40 mt-3">+{filteredPool.length-100} aur — search se filter karo</div>}
+          {filteredPool.length===0 && <div className="text-xs text-white/50 py-6 text-center">No device matches “{q}”</div>}
           <div className="mt-4 p-3 rounded-2xl bg-white/5 border border-white/10 text-xs leading-relaxed text-white/60">
             Table hata diya — 500+ devices pe bhi yehi pills dikhenge, page halka rahega. Recharge toggle ya SIM change karna ho to abhi bhi API se ho jayega, par default count-only rakha hai jaisa bola.
           </div>

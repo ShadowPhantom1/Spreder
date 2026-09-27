@@ -56,7 +56,7 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     next()
   } catch(e:any) {
     if(e.message?.includes('disabled')||e.message?.includes('expired')||e.message?.includes('IP')) throw e
-    return res.status(401).json({ error: 'Invalid token — web snapped.' })
+    return res.status(401).json({ error: 'Session expired — please login again.' })
   }
 }
 export function superRequired(req: AuthedRequest, res: Response, next: NextFunction){

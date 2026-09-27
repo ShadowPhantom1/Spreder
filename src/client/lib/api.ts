@@ -22,7 +22,24 @@ async function req(path: string, opts: RequestInit = {}) {
   const text = await res.text()
   let data: any
   try { data = text ? JSON.parse(text) : null } catch { data = text }
-  if (!res.ok) throw new Error(data?.error || data?.message || data?.details || `HTTP ${res.status}: ${text?.slice(0,200)}`)
+  if (!res.ok) {
+    const msg = data?.error || data?.message || data?.details || `HTTP ${res.status}: ${text?.slice(0,200)}`
+    if(res.status===401){
+      const isAuthRoute = path.includes('/api/auth/login') || path.includes('/api/auth/me')
+      if(!isAuthRoute){
+        try{ localStorage.removeItem('token') }catch{}
+        const loc = typeof window!=='undefined' ? window.location.pathname : ''
+        if(!loc.includes('/login') && !loc.includes('/super')){
+          if(loc.includes('/admin') || msg.includes('Super')) window.location.href='/super'
+          else window.location.href='/login'
+        }
+      }
+      // make message friendly
+      if(msg.includes('web snapped')||msg.includes('Invalid token')) throw new Error('Session expired — please login again.')
+      if(msg.includes('thwip')) throw new Error('Login required — please sign in.')
+    }
+    throw new Error(msg)
+  }
   return data
 }
 export const api = {

@@ -179,8 +179,12 @@ export default function Dashboard(){
             </div>
             <div className="rounded-2xl bg-[#0A1628] border border-white/10 p-3 text-center">
               <div className="text-[11px] tracking-widest font-bold text-white/50">DELIVERY</div>
-              <div className="font-display text-[22px] text-emerald-400">94.2%</div>
-              <div className="text-[11px] font-mono text-white/50">ACK within {settings.ack_timeout_ms||'15000'}ms</div>
+              <div className="font-display text-[22px] text-emerald-400">{(() => {
+                const s=camp.totalSent||0, f=camp.totalFailed||0, t=s+f
+                if(t===0) return '—'
+                return Math.round((s/t)*100)+'%'
+              })()}</div>
+              <div className="text-[11px] font-mono text-white/50">live • {camp.totalSent||0} sent / {camp.totalFailed||0} fail</div>
             </div>
             <div className="rounded-2xl bg-gradient-to-br from-[#FFD23F]/15 to-[#FF8A00]/10 border border-[#FFD23F]/20 p-3 text-center">
               <div className="text-[11px] tracking-widest font-bold text-[#FFD23F]">MSG/SEC</div>

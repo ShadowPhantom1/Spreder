@@ -9,6 +9,13 @@ export default function Login(){
   const [loading,setLoading]=useState(false)
   const [err,setErr]=useState<string | null>(null)
   const nav=useNavigate()
+  const getDeviceId=()=>{
+    try{
+      let id=localStorage.getItem('device_id')
+      if(!id){ id='dev_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('device_id', id)}
+      return id
+    }catch{ return 'web'}
+  }
   const submit=async(e:React.FormEvent)=>{
     e.preventDefault()
     setErr(null)
@@ -16,12 +23,17 @@ export default function Login(){
     try{
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-device-id': getDeviceId() },
         credentials: 'include',
         body: JSON.stringify({ username: u, password: p })
       })
       const data = await res.json().catch(()=>({}))
-      if(!res.ok) throw new Error(data?.error || `Login failed (${res.status})`)
+      if(!res.ok) {
+        let m = data?.error || `Login failed (${res.status})`
+        if(m.includes('Device not allowed')) m = 'Device locked — yeh ID pehle device se lock hai. Admin se bolo /adminbhnstock → Users → Revoke kare, phir new device se login hoga.'
+        if(m.includes('IP not allowed')) m = m + ' — Admin ne IP lock kiya hai. Revoke karwana padega.'
+        throw new Error(m)
+      }
       if(data.token) localStorage.setItem('token', data.token)
       nav('/dashboard')
     }catch(err:any){ setErr(err.message || 'Unknown error'); } finally{ setLoading(false)}

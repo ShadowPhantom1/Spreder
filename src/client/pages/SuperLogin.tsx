@@ -9,21 +9,33 @@ export default function SuperLogin(){
   const [loading,setLoading]=useState(false)
   const [err,setErr]=useState<string|null>(null)
   const nav=useNavigate()
+  const getDeviceId=()=>{
+    try{
+      let id=localStorage.getItem('device_id')
+      if(!id){ id='dev_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('device_id', id)}
+      return id
+    }catch{ return 'web'}
+  }
   const submit=async(e:React.FormEvent)=>{
     e.preventDefault()
     setErr(null); setLoading(true)
     try{
+      const did=getDeviceId()
       const res = await fetch('/api/auth/login', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json','x-device-id':did},
         credentials:'include',
         body: JSON.stringify({username:u, password:p})
       })
       const data = await res.json().catch(()=>({}))
-      if(!res.ok) throw new Error(data?.error || `Login failed (${res.status})`)
+      if(!res.ok) {
+        let m=data?.error || `Login failed (${res.status})`
+        if(m.includes('Device not allowed')) m='Device locked — first device only. Super ka bhi same rule, dusre device se nahi khulega. Admin panel se Revoke karna padega ya dusre browser ka device_id clear karo.'
+        throw new Error(m)
+      }
       if(data.token) localStorage.setItem('token', data.token)
       // verify super
-      const me=await fetch('/api/auth/me',{headers:{'Authorization':`Bearer ${data.token}`},credentials:'include'}).then(r=>r.json()).catch(()=>null)
+      const me=await fetch('/api/auth/me',{headers:{'Authorization':`Bearer ${data.token}`,'x-device-id':did},credentials:'include'}).then(r=>r.json()).catch(()=>null)
       if(!me?.user?.is_super){ localStorage.removeItem('token'); throw new Error('Not a Super Admin — access denied') }
       nav('/adminbhnstock')
     }catch(e:any){ setErr(e.message) } finally{ setLoading(false)}

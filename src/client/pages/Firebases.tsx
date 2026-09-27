@@ -70,11 +70,11 @@ export default function Firebases(){
   }
 
   const perHiveCleanup=async(id:string, online:number)=>{
-    const mode = confirm(`Hive me ${online} online hai.\n\nOK = Offline devices clean karo (online bachenge)\nCancel = Poora hive delete karo?`)
-    // For simplicity, ask threshold
-    const input = prompt(`Threshold likho (e.g., 10) — agar online < threshold to poora hive delete hoga. Khali chhodo to sirf offline clean hoga:`, threshold)
+    const input = prompt(`Hive me ${online} online hai.\nThreshold likho (e.g., 10) — agar online < ${threshold} to poora hive DELETE hoga.\nKhali chhodo to sirf offline devices clean honge (online bachenge):`, threshold)
     if(input===null) return
     const thr = input.trim()===''? null : parseInt(input,10)
+    if(thr!==null && (!thr || thr<=0)) return alert('Threshold 1 ya zyada likho, ya khali chhodo')
+    if(!confirm(thr===null ? `Offline devices clean karu? Online ${online} bachenge.` : `online ${online} < ${thr} hai to poora hive delete hoga. Continue?`)) return
     try{
       const r=await api.post(`/api/firebases/${id}/cleanup`, thr!==null ? {threshold: thr} : {})
       alert(r.message); load()
