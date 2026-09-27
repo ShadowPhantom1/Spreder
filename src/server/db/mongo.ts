@@ -1,13 +1,46 @@
 import mongoose from 'mongoose'
 
 export const UserSchema = new mongoose.Schema({_id:String, username:String, password_hash:String, role:String, is_super:Number, is_active:Number, allowed_device:String, per_sim_limit:Number, max_devices:Number, expires_at:String, created_at:String},{_id:false, collection:'users', strict:false})
+UserSchema.index({username:1}, {unique:true, background:true})
+UserSchema.index({is_active:1}, {background:true})
+UserSchema.index({created_at:-1}, {background:true})
+
 export const FirebaseSchema = new mongoose.Schema({_id:String, id:String, name:String, database_url:String, service_account_json:String, status:String, last_tested_at:String, device_count:Number, created_at:String},{_id:false, collection:'firebases', strict:false})
+FirebaseSchema.index({database_url:1}, {background:true})
+FirebaseSchema.index({status:1}, {background:true})
+
 export const DeviceSchema = new mongoose.Schema({_id:String, id:String, firebase_id:String, name:String, model:String, status:String, battery:Number, signal:Number, last_seen:String, total_sent:Number, total_failed:Number, extra:String, created_at:String, sim_count:Number, has_recharge:Number, sim1_recharge:Number, sim2_recharge:Number, validated_score:Number, validated_at:String, validator_fail_count:Number},{_id:false, collection:'devices', strict:false})
+DeviceSchema.index({status:1}, {background:true})
+DeviceSchema.index({firebase_id:1}, {background:true})
+DeviceSchema.index({firebase_id:1, status:1}, {background:true})
+DeviceSchema.index({last_seen:-1}, {background:true})
+DeviceSchema.index({status:1, last_seen:-1}, {background:true})
+
 export const CampaignSchema = new mongoose.Schema({_id:String, id:String, name:String, template:String, status:String, total:Number, sent:Number, failed:Number, pending:Number, created_at:String, started_at:String, finished_at:String},{_id:false, collection:'campaigns', strict:false})
+CampaignSchema.index({status:1}, {background:true})
+CampaignSchema.index({created_at:-1}, {background:true})
+CampaignSchema.index({status:1, created_at:-1}, {background:true})
+
 export const CampaignMessageSchema = new mongoose.Schema({_id:String, id:String, campaign_id:String, phone:String, variables:String, rendered:String, status:String, device_id:String, firebase_id:String, attempts:Number, last_error:String, sent_at:String, created_at:String},{_id:false, collection:'campaign_messages', strict:false})
+CampaignMessageSchema.index({campaign_id:1}, {background:true})
+CampaignMessageSchema.index({campaign_id:1, status:1}, {background:true})
+CampaignMessageSchema.index({device_id:1}, {background:true})
+CampaignMessageSchema.index({device_id:1, status:1, sent_at:1}, {background:true})
+CampaignMessageSchema.index({phone:1}, {background:true})
+CampaignMessageSchema.index({status:1}, {background:true})
+
 export const QueueItemSchema = new mongoose.Schema({_id:String, id:String, campaign_id:String, message_id:String, priority:Number, status:String, created_at:String},{_id:false, collection:'queue_items', strict:false})
+QueueItemSchema.index({campaign_id:1}, {background:true})
+QueueItemSchema.index({campaign_id:1, status:1}, {background:true})
+QueueItemSchema.index({status:1}, {background:true})
+QueueItemSchema.index({message_id:1}, {background:true})
+
 export const SettingSchema = new mongoose.Schema({_id:String, key:String, value:String, updated_at:String},{_id:false, collection:'settings', strict:false})
+
 export const SessionSchema = new mongoose.Schema({_id:String, user_id:String, ip:String, device_id:String, token:String, last_active:String},{_id:false, collection:'sessions', strict:false})
+SessionSchema.index({user_id:1}, {background:true})
+SessionSchema.index({token:1}, {background:true})
+SessionSchema.index({last_active:-1}, {background:true})
 
 export function getModels(){
   const User = mongoose.models.User || mongoose.model('User', UserSchema)

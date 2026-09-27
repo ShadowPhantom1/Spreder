@@ -10,7 +10,7 @@ const router = Router()
 async function getUserByUsername(username:string){
   if(useMongo){
     const User=mongoose.model('User')
-    const d=await User.findOne({_id: {$exists:true}, username} as any).lean() as any
+    const d=await User.findOne({username}).lean() as any
     if(d) return {...d, id:d._id}
     return null
   }
@@ -60,15 +60,14 @@ router.post('/login', async (req, res) => {
   const ok = bcrypt.compareSync(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
-  // FULLY MONGO sessions
-  try{
-    await Session.deleteOne({_id: user.id} as any)
-    await Session.deleteOne({user_id: user.id} as any)
-    await Session.create({_id: user.id, user_id: user.id, ip, device_id: deviceId, token, last_active: new Date().toISOString()} as any)
-  }catch{}
-  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id); db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString()) }catch{}
+  // respond first, sessions async (fire-and-forget) for speed
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, is_super: user.is_super } })
+  // async session update — don't block response
+  Session.deleteOne({_id: user.id} as any).catch(()=>{})
+  Session.deleteOne({user_id: user.id} as any).catch(()=>{})
+  Session.create({_id: user.id, user_id: user.id, ip, device_id: deviceId, token, last_active: new Date().toISOString()} as any).catch(()=>{})
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id); db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString()) }catch{}
   }catch(e:any){ console.error('[login] err',e); res.status(500).json({error:e.message})}
 })
 

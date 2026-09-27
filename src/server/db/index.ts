@@ -10,13 +10,31 @@ if(!config.MONGODB_URI){
   process.exit(1)
 }
 
-// connect
-await mongoose.connect(config.MONGODB_URI)
+// connect — optimized pool + timeouts for fast Atlas
+await mongoose.connect(config.MONGODB_URI, {
+  maxPoolSize: 20,
+  minPoolSize: 5,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 20000,
+  heartbeatFrequencyMS: 10000,
+  retryWrites: true,
+} as any)
 useMongo = true
-console.log('[DB] Mongo connected — FULLY Mongo (ALL DATA)')
+console.log('[DB] Mongo connected — FULLY Mongo (ALL DATA) | pool 20')
 
 const {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session} = getModels()
 export {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session}
+
+// ensure indexes in background (fast queries)
+Promise.all([
+  User.syncIndexes().catch(()=>{}),
+  Firebase.syncIndexes().catch(()=>{}),
+  Device.syncIndexes().catch(()=>{}),
+  Campaign.syncIndexes().catch(()=>{}),
+  CampaignMessage.syncIndexes().catch(()=>{}),
+  QueueItem.syncIndexes().catch(()=>{}),
+  Session.syncIndexes().catch(()=>{}),
+]).then(()=> console.log('[DB] indexes synced')).catch(()=>{})
 
 // keep sqlite db as dummy for legacy imports that still reference db.prepare (will throw if used)
 import Database from 'better-sqlite3'
