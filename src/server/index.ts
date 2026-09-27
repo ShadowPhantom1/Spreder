@@ -81,35 +81,57 @@ app.get('/api/stats', async (_req, res) => {
   res.json({ firebases: fbCount, devices: { ...devStats, capacity: { totalCapacity, remaining, perSim } }, campaigns: campStats, today: { totalToday, byDevice: todayByDevice, since: todayISO, capacity: { totalCapacity, remaining, perSim } } })
 })
 
-// Today stats dedicated — IST
-app.get('/api/stats/today', (_req, res)=>{
+// Today stats dedicated — IST — FULLY MONGO
+app.get('/api/stats/today', async (_req, res)=>{
   const istOffset = 5.5*60*60*1000
   const istNow = new Date(Date.now() + istOffset)
   istNow.setUTCHours(0,0,0,0)
   const iso=new Date(istNow.getTime() - istOffset).toISOString()
-  const total=(db.prepare("SELECT COUNT(*) as c FROM campaign_messages WHERE status='sent' AND sent_at >= ?").get(iso) as any).c
-  const byDevice=db.prepare("SELECT d.name, d.id, COUNT(m.id) as sent FROM campaign_messages m LEFT JOIN devices d ON d.id=m.device_id WHERE m.status='sent' AND m.sent_at >= ? GROUP BY m.device_id ORDER BY sent DESC").all(iso) as any[]
-  const byHour=db.prepare("SELECT substr(sent_at,12,2) as hr, COUNT(*) as c FROM campaign_messages WHERE status='sent' AND sent_at >= ? GROUP BY hr ORDER BY hr").all(iso) as any[]
-  res.json({ totalToday: total, byDevice, byHour, since: iso })
+  try{
+    const {CampaignMessage} = await import('./db/index.js')
+    const total = await CampaignMessage.countDocuments({status:'sent', sent_at: {$gte: iso}})
+    const byDeviceAgg = await CampaignMessage.aggregate([
+      {$match:{status:'sent', sent_at: {$gte: iso}}},
+      {$group:{_id:'$device_id', sent:{$sum:1}}},
+      {$sort:{sent:-1}},
+      {$lookup:{from:'devices', localField:'_id', foreignField:'_id', as:'dev'}},
+      {$unwind:{path:'$dev', preserveNullAndEmptyArrays:true}},
+      {$project:{id:'$_id', name:'$dev.name', sent:1}}
+    ]) as any[]
+    const byHour = await CampaignMessage.aggregate([
+      {$match:{status:'sent', sent_at: {$gte: iso}}},
+      {$group:{_id:{$substr:['$sent_at',11,2]}, c:{$sum:1}}},
+      {$sort:{_id:1}},
+      {$project:{hr:'$_id', c:1, _id:0}}
+    ]) as any[]
+    res.json({ totalToday: total, byDevice: byDeviceAgg, byHour, since: iso })
+  }catch(e:any){
+    // fallback dummy
+    res.json({ totalToday: 0, byDevice:[], byHour:[], since: iso })
+  }
 })
 
-// Cleanup old completed campaigns (auto-delete)
-app.post('/api/campaigns/cleanup', (req, res)=>{
-  const days = parseInt((req.body?.days ?? req.query.days ?? db.prepare("SELECT value FROM settings WHERE key='auto_delete_completed_after_days'").get() as any)?.value || '0',10)
-  if(!days || days<=0) return res.json({ deleted:0, message:'Auto-delete disabled (0 days)' })
-  const cutoff=new Date(Date.now() - days*24*60*60*1000).toISOString()
-  const toDelete=db.prepare("SELECT id FROM campaigns WHERE status='completed' AND finished_at < ?").all(cutoff) as any[]
-  let deleted=0
-  const txn=db.transaction(()=>{
+// Cleanup old completed campaigns (auto-delete) — FULLY MONGO
+app.post('/api/campaigns/cleanup', async (req, res)=>{
+  try{
+    const {Campaign, CampaignMessage, QueueItem, Setting} = await import('./db/index.js')
+    const setting = await Setting.findOne({_id:'auto_delete_completed_after_days'}).lean() as any
+    const days = parseInt((req.body?.days ?? req.query.days ?? setting?.value ?? '0'),10)
+    if(!days || days<=0) return res.json({ deleted:0, message:'Auto-delete disabled (0 days)' })
+    const cutoff=new Date(Date.now() - days*24*60*60*1000).toISOString()
+    const toDelete = await Campaign.find({status:'completed', finished_at: {$lt: cutoff}}).lean() as any[]
+    let deleted=0
     for(const r of toDelete){
-      db.prepare("DELETE FROM queue_items WHERE campaign_id=?").run(r.id)
-      db.prepare("DELETE FROM campaign_messages WHERE campaign_id=?").run(r.id)
-      db.prepare("DELETE FROM campaigns WHERE id=?").run(r.id)
+      const cid=r._id || r.id
+      await QueueItem.deleteMany({campaign_id: cid})
+      await CampaignMessage.deleteMany({campaign_id: cid})
+      await Campaign.deleteOne({_id: cid})
       deleted++
     }
-  })
-  txn()
-  res.json({ deleted, cutoff, days })
+    res.json({ deleted, cutoff, days })
+  }catch(e:any){
+    res.status(500).json({error:e.message})
+  }
 })
 
 // routes

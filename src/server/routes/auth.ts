@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { db, useMongo } from '../db/index.js'
+import { db, useMongo, Session } from '../db/index.js'
 import { config } from '../config/index.js'
 import mongoose from 'mongoose'
 
@@ -71,19 +71,25 @@ router.post('/login', async (req, res) => {
   const ok = bcrypt.compareSync(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id)
-  db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString())
+  // FULLY MONGO sessions
+  try{
+    await Session.deleteOne({_id: user.id} as any)
+    await Session.deleteOne({user_id: user.id} as any)
+    await Session.create({_id: user.id, user_id: user.id, ip, device_id: deviceId, token, last_active: new Date().toISOString()} as any)
+  }catch{}
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id); db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString()) }catch{}
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, is_super: user.is_super } })
   }catch(e:any){ console.error('[login] err',e); res.status(500).json({error:e.message})}
 })
 
-router.post('/logout', (req:any, res) => {
+router.post('/logout', async (req:any, res) => {
   try{
     const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
     if(token){
       const p:any = jwt.verify(token, config.JWT_SECRET)
-      db.prepare('DELETE FROM sessions WHERE user_id=?').run(p.id)
+      try{ await Session.deleteOne({_id: p.id} as any); await Session.deleteOne({user_id: p.id} as any) }catch{}
+      try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(p.id) }catch{}
     }
   }catch{}
   res.clearCookie('token', { path: '/' })

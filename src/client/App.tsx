@@ -11,8 +11,8 @@ import Login from './pages/Login'
 import Landing from './pages/Landing'
 import SuperLogin from './pages/SuperLogin'
 
-// OPEN_MODE syncs with server DISABLE_AUTH — true for preview, false for prod
-const OPEN_MODE = (import.meta as any).env?.VITE_OPEN_MODE !== 'false'
+// OPEN_MODE syncs with server DISABLE_AUTH — true for preview, false for prod (secure by default)
+const OPEN_MODE = (import.meta as any).env?.VITE_OPEN_MODE === 'true'
 
 function Guard({ children }: { children: React.ReactNode }){
   if (OPEN_MODE) return <>{children}</>

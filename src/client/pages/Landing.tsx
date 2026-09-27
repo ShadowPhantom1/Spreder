@@ -13,7 +13,7 @@ export default function Landing(){
           </div>
           <div className="flex items-center gap-2">
             <Link to="/login" className="px-4 py-2 rounded-full bg-white text-[#0A1628] text-sm font-black">Login</Link>
-            <Link to="/login" className="hidden sm:inline-flex px-4 py-2 rounded-full bg-[#E30613] text-white text-sm font-black">Super Admin</Link>
+            <Link to="/super" className="hidden sm:inline-flex px-4 py-2 rounded-full bg-[#E30613] text-white text-sm font-black">Super Admin</Link>
           </div>
         </div>
       </header>

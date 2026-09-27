@@ -8,8 +8,7 @@ export interface AuthedRequest extends Request {
   user?: { id: string; username: string; role: string }
 }
 
-// TEMP: auth disabled via DISABLE_AUTH env — set to "false" to re-enable password
-const DISABLE_AUTH = process.env.DISABLE_AUTH !== 'false' // default ON (no password) — change to false to require login
+const DISABLE_AUTH = process.env.DISABLE_AUTH === 'true'
 
 export async function authRequired(req: AuthedRequest, res: Response, next: NextFunction) {
   if (DISABLE_AUTH) {
@@ -44,8 +43,15 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     if(u.allowed_device && u.allowed_device!=='*' && u.allowed_device!==''){
       if(devId !== u.allowed_device) return res.status(403).json({ error: 'Device not allowed — first device only' })
     }
-    const sess = db.prepare('SELECT token FROM sessions WHERE user_id=?').get(payload.id) as any
-    if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+    // FULLY MONGO sessions — also keep sqlite dummy for legacy
+    try{
+      const {Session} = await import('../db/index.js')
+      const sess:any = await Session.findOne({_id: payload.id} as any).lean() || await Session.findOne({user_id: payload.id}).lean()
+      if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+    }catch{
+      const sess = db.prepare('SELECT token FROM sessions WHERE user_id=?').get(payload.id) as any
+      if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
+    }
     req.user = { ...payload, is_super: u.is_super, allowed_ip: u.allowed_ip, allowed_device: u.allowed_device } as any
     next()
   } catch(e:any) {

@@ -31,7 +31,14 @@ r.get('/users', async (req,res)=>{
           campsC = (db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any).c
         }
       }catch{}
-      const sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any
+      let sess:any=null
+      try{
+        const {Session} = await import('../db/index.js')
+        sess = await Session.findOne({_id: u.id} as any).lean() || await Session.findOne({user_id: u.id}).lean()
+        if(sess) sess = {ip:sess.ip, device_id:sess.device_id, last_active:sess.last_active}
+      }catch{
+        sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any
+      }
       return {...u, devices: devC, campaigns: campsC, session: sess||null}
     }))
     res.json(enriched)
@@ -91,7 +98,12 @@ r.post('/users/:id/disable', async (req,res)=>{
   } else {
     db.prepare('UPDATE users SET is_active=0 WHERE id=?').run(req.params.id)
   }
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id)
+  try{
+    const {Session} = await import('../db/index.js')
+    await Session.deleteOne({_id:req.params.id} as any)
+    await Session.deleteOne({user_id:req.params.id} as any)
+  }catch{}
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id) }catch{}
   res.json({ok:true})
 })
 r.post('/users/:id/enable', async (req,res)=>{
@@ -104,8 +116,13 @@ r.post('/users/:id/enable', async (req,res)=>{
   res.json({ok:true})
 })
 // kill session (force logout)
-r.post('/users/:id/kick', (req,res)=>{
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id)
+r.post('/users/:id/kick', async (req,res)=>{
+  try{
+    const {Session} = await import('../db/index.js')
+    await Session.deleteOne({_id:req.params.id} as any)
+    await Session.deleteOne({user_id:req.params.id} as any)
+  }catch{}
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id) }catch{}
   res.json({ok:true})
 })
 // reset device/IP lock (for first-login lock) — fully Mongo
@@ -116,7 +133,12 @@ r.post('/users/:id/reset-lock', async (req,res)=>{
   } else {
     db.prepare('UPDATE users SET allowed_ip=NULL, allowed_device=NULL WHERE id=?').run(req.params.id)
   }
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id)
+  try{
+    const {Session} = await import('../db/index.js')
+    await Session.deleteOne({_id:req.params.id} as any)
+    await Session.deleteOne({user_id:req.params.id} as any)
+  }catch{}
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id) }catch{}
   res.json({ok:true, msg:'Lock reset — next login will lock to new device/IP'})
 })
 // delete user + wipe data — fully Mongo
@@ -132,26 +154,46 @@ r.delete('/users/:id', async (req,res)=>{
     if(u?.is_super===1) return res.status(403).json({error:'cannot delete super'})
     db.prepare('DELETE FROM users WHERE id=?').run(id)
   }
-  db.prepare('DELETE FROM sessions WHERE user_id=?').run(id)
+  try{
+    const {Session} = await import('../db/index.js')
+    await Session.deleteOne({_id:id} as any)
+    await Session.deleteOne({user_id:id} as any)
+  }catch{}
+  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(id) }catch{}
   res.json({ok:true})
 })
 
-// storage clean for a user (or global for now)
-r.post('/storage/clean', (req,res)=>{
+// storage clean — FULLY MONGO
+r.post('/storage/clean', async (req,res)=>{
   const { userId, days=3 } = req.body
   const cutoff=new Date(Date.now()-days*24*60*60*1000).toISOString()
-  let deleted=0
-  const toDel=db.prepare("SELECT id FROM campaigns WHERE status='completed' AND finished_at < ?").all(cutoff) as any[]
-  const txn=db.transaction(()=>{
+  try{
+    const {Campaign, CampaignMessage, QueueItem} = await import('../db/index.js')
+    const toDel = await Campaign.find({status:'completed', finished_at: {$lt: cutoff}}).lean() as any[]
+    let deleted=0
     for(const r of toDel){
-      db.prepare('DELETE FROM queue_items WHERE campaign_id=?').run(r.id)
-      db.prepare('DELETE FROM campaign_messages WHERE campaign_id=?').run(r.id)
-      db.prepare('DELETE FROM campaigns WHERE id=?').run(r.id)
+      const cid=r._id || r.id
+      await QueueItem.deleteMany({campaign_id: cid})
+      await CampaignMessage.deleteMany({campaign_id: cid})
+      await Campaign.deleteOne({_id: cid})
       deleted++
     }
-  })
-  txn()
-  res.json({deleted, cutoff})
+    return res.json({deleted, cutoff})
+  }catch(e:any){
+    // fallback sqlite
+    let deleted=0
+    const toDel=db.prepare("SELECT id FROM campaigns WHERE status='completed' AND finished_at < ?").all(cutoff) as any[]
+    const txn=db.transaction(()=>{
+      for(const r of toDel){
+        db.prepare('DELETE FROM queue_items WHERE campaign_id=?').run(r.id)
+        db.prepare('DELETE FROM campaign_messages WHERE campaign_id=?').run(r.id)
+        db.prepare('DELETE FROM campaigns WHERE id=?').run(r.id)
+        deleted++
+      }
+    })
+    txn()
+    res.json({deleted, cutoff})
+  }
 })
 
 export default r
