@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { Campaign, CampaignMessage, Setting } from '../db/index.js'
+import { Campaign, CampaignMessage, QueueItem, Setting } from '../db/index.js'
 import { authRequired } from '../middleware/auth.js'
 import * as queueService from '../services/queueService.js'
 
@@ -162,6 +162,9 @@ router.post('/bulk-delete', async (req, res)=>{
   const { ids } = req.body || {}
   if(!Array.isArray(ids)) return res.status(400).json({ error:'ids array required' })
   const r=await Campaign.deleteMany({_id:{$in:ids}})
+  // cascade — prevent orphan queue/messages that jam dispatch (deep fix for user report)
+  await CampaignMessage.deleteMany({campaign_id:{$in:ids}})
+  await QueueItem.deleteMany({campaign_id:{$in:ids}})
   res.json({ deleted: r.deletedCount })
 })
 
@@ -184,7 +187,11 @@ router.post('/:id/cancel', async (req, res) => {
   res.json(c)
 })
 router.delete('/:id', async (req, res) => {
-  await Campaign.deleteOne({_id:req.params.id})
+  const id=req.params.id
+  await Campaign.deleteOne({_id:id})
+  // cascade — deep fix: delete orphan messages/queue so next shoot not jammed
+  await CampaignMessage.deleteMany({campaign_id:id})
+  await QueueItem.deleteMany({campaign_id:id})
   res.json({ ok: true })
 })
 
