@@ -15,11 +15,13 @@ const nav = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [stats, setStats] = useState<any>(null)
+  const [me, setMe] = useState<any>(null)
   const navHook = useNavigate()
   const [settings,setSettings]=useState<any>({})
   useEffect(() => {
     api.stats().then(setStats).catch(()=>{})
     api.get('/api/settings').then(setSettings).catch(()=>{})
+    api.get('/api/auth/me').then((r:any)=> setMe(r)).catch(()=>{})
     const id = setInterval(()=> {
       api.stats().then(setStats).catch(()=>{})
       api.get('/api/settings').then(setSettings).catch(()=>{})
@@ -94,10 +96,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex flex-col items-end leading-none mr-1">
-              <span className="text-xs font-bold tracking-widest">PETER • ADMIN</span>
-              <span className="text-[10px] font-mono text-white/50">Earth-616 • NYC Hive</span>
+              <span className="text-xs font-black tracking-widest">{me?.user?.username ? me.user.username.toUpperCase() : '—'} {me?.user?.is_super ? '• SUPER' : ''}</span>
+              <span className="text-[10px] font-mono text-white/50">{me?.user?.is_super ? 'SUPER • ALL HIVES' : 'USER • SECURED'} {me?.user?.username ? `• ${me.user.username}` : ''}</span>
             </div>
-            <img src="https://i.pravatar.cc/100?img=15" alt="avatar" className="w-9 h-9 rounded-full border-2 border-[#E30613] object-cover" />
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E30613] to-[#9A0007] border-2 border-white/15 grid place-items-center font-black text-white text-sm shrink-0">
+              {me?.user?.username ? me.user.username.slice(0,1).toUpperCase() : '?'}
+            </div>
             <button onClick={logout} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[#0A1628] text-xs font-bold hover:bg-white/90 transition">
               <LogOut size={14}/> EXIT
             </button>
