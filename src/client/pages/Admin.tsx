@@ -11,6 +11,7 @@ export default function Admin(){
   const [tab,setTab]=useState<'dash'|'users'|'sec'|'sys'>('dash')
   const [q,setQ]=useState('')
   const [filter,setFilter]=useState<'all'|'active'|'disabled'|'super'>('all')
+  const [showAdd,setShowAdd]=useState(false)
 
   const load=async()=>{
     try{
@@ -18,7 +19,13 @@ export default function Admin(){
       setUsers(d); if(s) setStats(s)
     }catch(e:any){ setMsg(e.message)}
   }
-  useEffect(()=>{ load() },[])
+  useEffect(()=>{
+    // security: if not super, kick to /super
+    api.get('/api/auth/me').then((r:any)=>{
+      if(!r?.user?.is_super) window.location.href='/super'
+    }).catch(()=>{})
+    load()
+  },[])
 
   const create=async()=>{
     if(!form.username || !form.password) return setMsg('Username & password required')
@@ -144,19 +151,36 @@ export default function Admin(){
 
       {tab==='users' && (
         <div className="space-y-4">
-          {/* CREATE */}
-          <div className="rounded-2xl bg-white p-5 border border-[#BFDBFF] shadow-sm">
-            <h2 className="font-black text-[#0066CC] flex items-center gap-2"><UserPlus size={18}/> Create New User</h2>
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mt-4">
-              <input placeholder="username" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/>
-              <input placeholder="password" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/>
-              <input placeholder="per SIM" type="number" value={form.per_sim_limit} onChange={e=>setForm({...form, per_sim_limit:parseInt(e.target.value)||100})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/>
-              <input placeholder="max devices" type="number" value={form.max_devices} onChange={e=>setForm({...form, max_devices:parseInt(e.target.value)||100})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/>
-              <input placeholder="IP * or 1.2.3.4" value={form.allowed_ip} onChange={e=>setForm({...form, allowed_ip:e.target.value})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/>
-              <input type="date" value={form.expires_at} onChange={e=>setForm({...form, expires_at:e.target.value})} className="px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/>
-              <button onClick={create} className="px-4 py-2.5 rounded-xl bg-[#0066CC] hover:bg-[#0052A3] text-white font-black shadow">Create</button>
-            </div>
+          {/* CREATE — modal */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-zinc-600">Dash • Users List • Add via popup → <b>MongoDB</b> + <b>SQLite</b> dual (URI hai to Mongo, nahi to local)</div>
+            <button onClick={()=>setShowAdd(true)} className="px-5 py-2.5 rounded-xl bg-[#0066CC] hover:bg-[#0052A3] text-white font-black flex items-center gap-2 shadow"><UserPlus size={16}/> Add User</button>
           </div>
+          {showAdd && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div onClick={()=>setShowAdd(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+              <motion.div initial={{scale:0.95,opacity:0}} animate={{scale:1,opacity:1}} className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-[#BFDBFF] max-h-[90vh] overflow-auto">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-black text-[#0066CC] flex items-center gap-2"><UserPlus size={18}/> New User</h2>
+                  <button onClick={()=>setShowAdd(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center">✕</button>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">Fill and Create → auto save to <b>Mongo</b> (if URI) + <b>local DB</b> fallback</p>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <label className="col-span-2"><span className="text-xs font-bold">Username</span><input placeholder="username" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
+                  <label className="col-span-2"><span className="text-xs font-bold">Password</span><input placeholder="password" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
+                  <label><span className="text-xs font-bold">Per SIM</span><input type="number" value={form.per_sim_limit} onChange={e=>setForm({...form, per_sim_limit:parseInt(e.target.value)||100})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
+                  <label><span className="text-xs font-bold">Max Devices</span><input type="number" value={form.max_devices} onChange={e=>setForm({...form, max_devices:parseInt(e.target.value)||100})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
+                  <label><span className="text-xs font-bold">Allowed IP</span><input placeholder="* or 1.2.3.4" value={form.allowed_ip} onChange={e=>setForm({...form, allowed_ip:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
+                  <label><span className="text-xs font-bold">Expiry</span><input type="date" value={form.expires_at} onChange={e=>setForm({...form, expires_at:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl bg-zinc-100 font-bold">Cancel</button>
+                  <button onClick={async()=>{ await create(); setShowAdd(false)}} className="flex-1 py-2.5 rounded-xl bg-[#0066CC] text-white font-black">Create → Mongo + SQL</button>
+                </div>
+                <div className="mt-3 text-xs text-center text-zinc-500">URI hai to <b>MongoDB</b> + local, nahi to <b>SQLite fallback</b></div>
+              </motion.div>
+            </div>
+          )}
 
           {/* LIST — premium table */}
           <div className="rounded-2xl bg-white p-5 border border-[#BFDBFF] shadow-sm">
