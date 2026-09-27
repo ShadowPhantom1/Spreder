@@ -1,15 +1,43 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { db } from '../db/index.js'
+import { db, useMongo } from '../db/index.js'
 import { config } from '../config/index.js'
+import mongoose from 'mongoose'
 
 const router = Router()
 
-router.post('/login', (req, res) => {
+async function getUserByUsername(username:string){
+  if(useMongo){
+    const User=mongoose.model('User')
+    const d=await User.findOne({_id: {$exists:true}, username} as any).lean() as any
+    if(d) return {...d, id:d._id}
+    return null
+  }
+  return db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any
+}
+async function getUserById(id:string){
+  if(useMongo){
+    const User=mongoose.model('User')
+    const d=await User.findOne({_id:id}).lean() as any
+    if(d) return {...d, id:d._id}
+    return null
+  }
+  return db.prepare('SELECT * FROM users WHERE id=?').get(id) as any
+}
+async function updateUserLock(id:string, ip:string, deviceId:string){
+  if(useMongo){
+    const User=mongoose.model('User')
+    await User.updateOne({_id:id}, {$set:{allowed_ip:ip, allowed_device:deviceId}})
+  } else {
+    db.prepare('UPDATE users SET allowed_ip=?, allowed_device=? WHERE id=?').run(ip, deviceId, id)
+  }
+}
+
+router.post('/login', async (req, res) => {
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'username & password required' })
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any
+  const user = await getUserByUsername(username) as any
   if (!user) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   if(user.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
   if(user.expires_at && new Date(user.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
@@ -19,7 +47,7 @@ router.post('/login', (req, res) => {
   if((!user.allowed_ip || user.allowed_ip==='') && (!user.allowed_device || user.allowed_device==='')){
     // super admin ko auto-lock nahi
     if(user.is_super!==1){
-      db.prepare('UPDATE users SET allowed_ip=?, allowed_device=? WHERE id=?').run(ip, deviceId, user.id)
+      await updateUserLock(user.id, ip, deviceId)
       user.allowed_ip = ip
       user.allowed_device = deviceId
       console.log(`[Auth] First login lock ${user.username} → IP ${ip} Device ${deviceId.slice(0,20)}`)
@@ -60,13 +88,13 @@ router.post('/logout', (req:any, res) => {
   res.json({ ok: true })
 })
 
-router.get('/me', (req: any, res) => {
+router.get('/me', async (req: any, res) => {
   const raw = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : req.headers.authorization?.slice(7))
   const token = raw as string
   if (!token) return res.status(401).json({ error: 'No token' })
   try {
     const payload = jwt.verify(token, config.JWT_SECRET) as any
-    const u = db.prepare('SELECT is_super, is_active FROM users WHERE id=?').get(payload.id) as any
+    const u = await getUserById(payload.id) as any
     res.json({ user: {...payload, is_super: u?.is_super||0, is_active: u?.is_active} })
   } catch { res.status(401).json({ error: 'Invalid' }) }
 })

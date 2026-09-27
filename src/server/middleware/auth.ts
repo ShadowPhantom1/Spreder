@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config/index.js'
-import { db } from '../db/index.js'
+import { db, useMongo } from '../db/index.js'
+import mongoose from 'mongoose'
 
 export interface AuthedRequest extends Request {
   user?: { id: string; username: string; role: string }
@@ -10,7 +11,7 @@ export interface AuthedRequest extends Request {
 // TEMP: auth disabled via DISABLE_AUTH env — set to "false" to re-enable password
 const DISABLE_AUTH = process.env.DISABLE_AUTH !== 'false' // default ON (no password) — change to false to require login
 
-export function authRequired(req: AuthedRequest, res: Response, next: NextFunction) {
+export async function authRequired(req: AuthedRequest, res: Response, next: NextFunction) {
   if (DISABLE_AUTH) {
     req.user = { id: 'open-mode', username: 'admin', role: 'admin' } as any
     return next()
@@ -19,7 +20,14 @@ export function authRequired(req: AuthedRequest, res: Response, next: NextFuncti
   if (!token) return res.status(401).json({ error: 'Unauthorized — thwip! Login required.' })
   try {
     const payload = jwt.verify(token, config.JWT_SECRET) as any
-    const u = db.prepare('SELECT id, username, role, is_active, is_super, allowed_ip, allowed_device, expires_at FROM users WHERE id=?').get(payload.id) as any
+    let u:any
+    if(useMongo){
+      const User=mongoose.model('User')
+      const d=await User.findOne({_id:payload.id}).lean() as any
+      if(d) u={...d, id:d._id}
+    } else {
+      u = db.prepare('SELECT id, username, role, is_active, is_super, allowed_ip, allowed_device, expires_at FROM users WHERE id=?').get(payload.id) as any
+    }
     if(!u) return res.status(401).json({ error: 'User not found' })
     if(u.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
     if(u.expires_at && new Date(u.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })

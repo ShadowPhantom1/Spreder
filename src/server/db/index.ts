@@ -12,39 +12,23 @@ db.pragma('synchronous = NORMAL')
 db.pragma('wal_autocheckpoint = 1000')
 db.pragma('foreign_keys = ON')
 
-// Mongo fallback: if MONGODB_URI set, also save there; else local only
+// Mongo fully — no local fallback for users (other tables still SQLite for now, next full migration)
 import mongoose from 'mongoose'
 export let useMongo = false
+const userSchema = new mongoose.Schema({ _id:String, username:String, password_hash:String, role:String, is_super:Number, is_active:Number, allowed_ip:String, allowed_device:String, per_sim_limit:Number, max_devices:Number, expires_at:String, created_at:String }, { _id:false, collection:'users' })
+try{ mongoose.model('User', userSchema) }catch{}
 if(config.MONGODB_URI){
+  // will connect; useMongo set on success
   mongoose.connect(config.MONGODB_URI).then(async ()=>{
     useMongo = true
-    console.log('[DB] Mongo connected — dual save (Mongo + local fallback) active')
-    // restore users from Mongo if local empty (Render ephemeral FS)
-    try{
-      const cnt=(db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c
-      if(cnt<=1){ // only admin or empty → try restore
-        const User=mongoose.model('User')
-        const docs:any[]=await User.find().lean() as any
-        if(docs.length>cnt){
-          for(const d of docs){
-            const _id=(d._id as any)?.toString?.() || (d as any)._id || (d as any).id
-            const exists=db.prepare('SELECT id FROM users WHERE id=?').get(_id) as any
-            if(!exists){
-              try{
-                db.prepare('INSERT INTO users (id, username, password_hash, role, is_super, is_active, allowed_ip, allowed_device, per_sim_limit, max_devices, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(_id, (d as any).username, (d as any).password_hash, (d as any).role||'user', (d as any).is_super||0, (d as any).is_active??1, (d as any).allowed_ip||null, (d as any).allowed_device||null, (d as any).per_sim_limit||100, (d as any).max_devices||100, (d as any).expires_at||null, (d as any).created_at||new Date().toISOString())
-              }catch{}
-            }
-          }
-          console.log(`[DB] Restored ${docs.length} users from Mongo → SQLite`)
-        }
-      }
-    }catch(e:any){ console.log('[DB] Mongo restore fail',e.message)}
+    console.log('[DB] Mongo connected — FULLY Mongo for users (no local fallback)')
   }).catch(e=>{
-    console.log('[DB] Mongo connect fail, using local DB fallback:', e.message)
+    console.log('[DB] Mongo connect fail:', e.message)
+    process.exit(1)
   })
-  // simple User schema for Mongo dual save
-  const userSchema = new mongoose.Schema({ _id:String, username:String, password_hash:String, role:String, is_super:Number, is_active:Number, allowed_ip:String, per_sim_limit:Number, max_devices:Number, expires_at:String, created_at:String }, { _id:false, collection:'users' })
-  try{ mongoose.model('User', userSchema) }catch{}
+} else {
+  console.log('[DB] MONGODB_URI missing — exiting (fully Mongo required)')
+  process.exit(1)
 }
 
 // Schema
@@ -149,21 +133,35 @@ try{ db.exec("ALTER TABLE devices ADD COLUMN validated_score INTEGER DEFAULT 0")
 try{ db.exec("ALTER TABLE devices ADD COLUMN validated_at TEXT") }catch{}
 try{ db.exec("ALTER TABLE devices ADD COLUMN validator_fail_count INTEGER DEFAULT 0") }catch{}
 
-// Seed admin user
+// Seed admin user — SQLite (legacy) + Mongo (primary)
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 
 const adminExists = db.prepare('SELECT id, is_super FROM users WHERE username = ?').get(config.ADMIN_USER) as any
 if (!adminExists) {
   const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
+  const id=randomUUID()
   db.prepare('INSERT INTO users (id, username, password_hash, role, is_super, is_active, created_at) VALUES (?, ?, ?, ?, 1, 1, ?)').run(
-    randomUUID(),
+    id,
     config.ADMIN_USER,
     hash,
     'admin',
     new Date().toISOString()
   )
-  console.log(`[DB] Seeded super admin: ${config.ADMIN_USER} / ${config.ADMIN_PASS}`)
+  console.log(`[DB] Seeded super admin SQLite: ${config.ADMIN_USER} / ${config.ADMIN_PASS}`)
+  // also seed Mongo
+  setTimeout(async()=>{
+    try{
+      if(mongoose.connection.readyState===1){
+        const User=mongoose.model('User')
+        const exists=await User.findOne({username:config.ADMIN_USER}).lean()
+        if(!exists){
+          await User.create({_id:id, username:config.ADMIN_USER, password_hash:hash, role:'admin', is_super:1, is_active:1, allowed_ip:null, allowed_device:null, per_sim_limit:100, max_devices:100, expires_at:null, created_at:new Date().toISOString()})
+          console.log(`[DB] Seeded super admin Mongo: ${config.ADMIN_USER}`)
+        }
+      }
+    }catch(e:any){ console.log('[DB] Mongo seed fail',e.message)}
+  },1500)
 } else if(adminExists.is_super!==1){
   db.prepare('UPDATE users SET is_super=1, is_active=1 WHERE username=?').run(config.ADMIN_USER)
   console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
