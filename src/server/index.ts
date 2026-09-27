@@ -146,22 +146,23 @@ io.on('connection', (socket) => {
 })
 
 // start
-httpServer.listen(config.PORT, config.HOST, () => {
+httpServer.listen(config.PORT, config.HOST, async () => {
   console.log(`\n🕷️  BHNSTOCK SMS SPREADER 3D WEB — Brand New Day`)
   console.log(`   ███████╗██████╗ ██╗██████╗ ███████╗██████╗ `)
   console.log(`   Server running at http://${config.HOST}:${config.PORT}`)
-  console.log(`   Env: ${config.NODE_ENV} | DB: ${config.DATABASE_PATH}`)
+  console.log(`   Env: ${config.NODE_ENV} | DB: MongoDB (fully)`)
   console.log(`   Admin: ${config.ADMIN_USER} / ${config.ADMIN_PASS}\n`)
   devicePoller.start()
   deviceValidator.startValidator()
 
-  // seed demo firebase if empty
-  const count = (db.prepare('SELECT COUNT(*) as c FROM firebases').get() as any).c
-  if (count === 0) {
-    const id = 'fb_demo_' + Math.random().toString(36).slice(2,6)
-    db.prepare('INSERT INTO firebases (id, name, database_url, status, created_at) VALUES (?, ?, ?, ?, ?)').run(
-      id, 'BHNSTOCK • NYC Hive-01 (Demo)', 'https://bhnstock-demo-spiderverse.mock.firebaseio.com', 'online', new Date().toISOString()
-    )
-    console.log(`[Seed] Demo Firebase created: ${id}`)
-  }
+  // seed demo firebase if empty — Mongo
+  try{
+    const {Firebase} = await import('./db/index.js')
+    const count = await Firebase.countDocuments()
+    if (count === 0) {
+      const id = 'fb_demo_' + Math.random().toString(36).slice(2,6)
+      await Firebase.create({_id:id, id, name:'BHNSTOCK • NYC Hive-01 (Demo)', database_url:'https://bhnstock-demo-spiderverse.mock.firebaseio.com', status:'online', created_at:new Date().toISOString()})
+      console.log(`[Seed] Demo Firebase created: ${id}`)
+    }
+  }catch(e:any){ console.log('[Seed] demo fail',e.message)}
 })
