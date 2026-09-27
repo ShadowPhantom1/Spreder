@@ -16,9 +16,29 @@ db.pragma('foreign_keys = ON')
 import mongoose from 'mongoose'
 export let useMongo = false
 if(config.MONGODB_URI){
-  mongoose.connect(config.MONGODB_URI).then(()=>{
+  mongoose.connect(config.MONGODB_URI).then(async ()=>{
     useMongo = true
     console.log('[DB] Mongo connected — dual save (Mongo + local fallback) active')
+    // restore users from Mongo if local empty (Render ephemeral FS)
+    try{
+      const cnt=(db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c
+      if(cnt<=1){ // only admin or empty → try restore
+        const User=mongoose.model('User')
+        const docs:any[]=await User.find().lean() as any
+        if(docs.length>cnt){
+          for(const d of docs){
+            const _id=(d._id as any)?.toString?.() || (d as any)._id || (d as any).id
+            const exists=db.prepare('SELECT id FROM users WHERE id=?').get(_id) as any
+            if(!exists){
+              try{
+                db.prepare('INSERT INTO users (id, username, password_hash, role, is_super, is_active, allowed_ip, allowed_device, per_sim_limit, max_devices, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(_id, (d as any).username, (d as any).password_hash, (d as any).role||'user', (d as any).is_super||0, (d as any).is_active??1, (d as any).allowed_ip||null, (d as any).allowed_device||null, (d as any).per_sim_limit||100, (d as any).max_devices||100, (d as any).expires_at||null, (d as any).created_at||new Date().toISOString())
+              }catch{}
+            }
+          }
+          console.log(`[DB] Restored ${docs.length} users from Mongo → SQLite`)
+        }
+      }
+    }catch(e:any){ console.log('[DB] Mongo restore fail',e.message)}
   }).catch(e=>{
     console.log('[DB] Mongo connect fail, using local DB fallback:', e.message)
   })
