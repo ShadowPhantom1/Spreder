@@ -5,7 +5,11 @@ import Campaigns from './pages/Campaigns'
 import Devices from './pages/Devices'
 import Firebases from './pages/Firebases'
 import Settings from './pages/Settings'
-import Admin from './pages/Admin'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminDash from './pages/admin/Dashboard'
+import AdminUsers from './pages/admin/Users'
+import AdminSecurity from './pages/admin/Security'
+import AdminSystem from './pages/admin/System'
 import Docs from './pages/Docs'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -37,8 +41,18 @@ export default function App(){
         <Route path="/devices" element={<Guard><Layout><Devices/></Layout></Guard>} />
         <Route path="/firebases" element={<Guard><Layout><Firebases/></Layout></Guard>} />
         <Route path="/settings" element={<Guard><Layout><Settings/></Layout></Guard>} />
-        <Route path="/admin" element={<SuperGuard><Admin/></SuperGuard>} />
-        <Route path="/adminbhnstock" element={<SuperGuard><Admin/></SuperGuard>} />
+        <Route path="/admin" element={<SuperGuard><AdminLayout/></SuperGuard>}>
+          <Route index element={<AdminDash/>} />
+          <Route path="users" element={<AdminUsers/>} />
+          <Route path="security" element={<AdminSecurity/>} />
+          <Route path="system" element={<AdminSystem/>} />
+        </Route>
+        <Route path="/adminbhnstock" element={<SuperGuard><AdminLayout/></SuperGuard>}>
+          <Route index element={<AdminDash/>} />
+          <Route path="users" element={<AdminUsers/>} />
+          <Route path="security" element={<AdminSecurity/>} />
+          <Route path="system" element={<AdminSystem/>} />
+        </Route>
         <Route path="/docs" element={<Guard><Layout><Docs/></Layout></Guard>} />
         <Route path="*" element={<Navigate to="/" replace/>} />
       </Routes>
