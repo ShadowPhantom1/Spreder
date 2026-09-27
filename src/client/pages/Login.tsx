@@ -28,7 +28,7 @@ export default function Login(){
       if(mode==='super'){
         const me=await fetch('/api/auth/me',{headers:{'Authorization':`Bearer ${data.token}`},credentials:'include'}).then(r=>r.json()).catch(()=>null)
         if(!me?.user?.is_super){ localStorage.removeItem('token'); throw new Error('Not a Super Admin — access denied') }
-        nav('/admin')
+        nav('/adminbhnstock')
       } else {
         nav('/dashboard')
       }

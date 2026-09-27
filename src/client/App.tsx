@@ -38,6 +38,7 @@ export default function App(){
         <Route path="/firebases" element={<Guard><Layout><Firebases/></Layout></Guard>} />
         <Route path="/settings" element={<Guard><Layout><Settings/></Layout></Guard>} />
         <Route path="/admin" element={<SuperGuard><Admin/></SuperGuard>} />
+        <Route path="/adminbhnstock" element={<SuperGuard><Admin/></SuperGuard>} />
         <Route path="/docs" element={<Guard><Layout><Docs/></Layout></Guard>} />
         <Route path="*" element={<Navigate to="/" replace/>} />
       </Routes>

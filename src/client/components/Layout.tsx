@@ -9,17 +9,13 @@ const nav = [
   { to: '/devices', label: 'Devices', icon: Smartphone, sub: 'Spider-Bots', img: '/icons/icon-devices.png' },
   { to: '/firebases', label: 'Firebase Hives', icon: Database, sub: 'RTDB Hives', img: '/icons/icon-hives.png' },
   { to: '/settings', label: 'Settings', icon: Settings, sub: 'Suit Config', img: '/icons/icon-settings.png' },
-  { to: '/admin', label: 'Super Admin', icon: Crown, sub: 'Nivea 3D', img: '/icons/icon-admin.png', superOnly: true },
   { to: '/docs', label: 'Docs', icon: BookOpen, sub: 'Single Source', img: '/icons/icon-docs.png' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [stats, setStats] = useState<any>(null)
-  const [isSuper, setIsSuper] = useState(false)
   const navHook = useNavigate()
-  useEffect(()=>{ api.get('/api/auth/me').then((r:any)=> setIsSuper(!!r?.user?.is_super)).catch(()=>{}) },[])
-  const filteredNav = nav.filter((n:any)=> !(n as any).superOnly || isSuper)
   const [settings,setSettings]=useState<any>({})
   useEffect(() => {
     api.stats().then(setStats).catch(()=>{})
@@ -116,7 +112,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <aside className={`fixed lg:sticky top-[66px] z-30 h-[calc(100vh-66px)] w-[280px] lg:w-[260px] shrink-0 bg-[#0A1628]/90 lg:bg-transparent backdrop-blur-xl lg:backdrop-blur-none border-r border-white/[0.06] lg:border-white/[0.04] transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           <div className="absolute inset-0 web-lines opacity-[0.03] pointer-events-none hidden lg:block" />
           <nav className="relative p-3 space-y-1.5 overflow-y-auto h-full">
-            {filteredNav.map((n:any) => (
+            {nav.map((n:any) => (
               <NavLink key={n.to} to={n.to} onClick={()=>setOpen(false)}
                 className={({isActive})=>`group flex items-center gap-3 px-3 py-3 rounded-2xl border transition-all ${isActive ? 'bg-gradient-to-br from-[#E30613] to-[#9A0007] border-[#E30613] shadow-spidey text-white' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.07] hover:border-white/15 text-white/80 hover:text-white'}`}>
                 <div className="w-9 h-9 rounded-xl bg-white/[0.08] group-[.active]:bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
