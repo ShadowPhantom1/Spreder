@@ -65,19 +65,18 @@ export default function SuperLogin(){
           <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-black tracking-widest text-[#E30613]">SUPER USERNAME</span>
-              <input value={u} onChange={e=>setU(e.target.value)} required className="mt-1 w-full px-4 py-3 rounded-xl bg-[#FFF0F0] border-2 border-[#E30613]/15 outline-none focus:border-[#E30613] focus:bg-white text-sm font-bold" placeholder="admin" />
+              <input value={u} onChange={e=>setU(e.target.value)} required className="mt-1 w-full px-4 py-3 rounded-xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] focus:bg-white text-sm font-bold text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]" placeholder="admin" />
             </label>
             <label className="block">
               <span className="text-xs font-black tracking-widest text-[#0A1628]">PASSWORD</span>
               <div className="mt-1 relative">
-                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required className="w-full px-4 py-3 pr-12 rounded-xl bg-[#F0F7FF] border-2 border-[#0066CC]/15 outline-none focus:border-[#0066CC] focus:bg-white text-sm" placeholder="••••••••" />
-                <button type="button" onClick={()=>setShow(v=>!v)} className="absolute right-1 top-1 bottom-1 w-10 grid place-items-center rounded-xl hover:bg-black/5">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>
+                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required className="w-full px-4 py-3 pr-12 rounded-xl bg-white border-2 border-zinc-200 outline-none focus:border-[#0066CC] focus:bg-white text-sm text-[#0A1628] placeholder:text-zinc-400 caret-[#0066CC]" placeholder="••••••••" />
+                <button type="button" onClick={()=>setShow(v=>!v)} className="absolute right-1 top-1 bottom-1 w-10 grid place-items-center rounded-xl hover:bg-black/5 text-zinc-500">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>
               </div>
             </label>
             <button disabled={loading} className="w-full py-3 rounded-full text-white text-sm font-black flex items-center justify-center gap-2 bg-gradient-to-r from-[#E30613] to-[#9A0007] hover:from-[#FF2D3B] hover:to-[#E30613] shadow-[0_8px_20px_rgba(227,6,19,0.35)] disabled:opacity-60">
               <Crown size={16}/>{loading?'THWIPPING…':'ENTER SPIDER CONSOLE'}
             </button>
-            <div className="text-center text-[11px] text-zinc-500">Default: <b>admin / admin123456</b> — change after first login</div>
           </div>
         </form>
 

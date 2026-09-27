@@ -52,13 +52,13 @@ export default function Login(){
           <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-black tracking-widest text-black/60">USERNAME</span>
-              <input value={u} onChange={e=>setU(e.target.value)} required className="mt-1 w-full px-4 py-3 rounded-xl bg-black/5 border border-black/10 outline-none focus:border-[#E30613]/40 text-sm" placeholder="your username" />
+              <input value={u} onChange={e=>setU(e.target.value)} required className="mt-1 w-full px-4 py-3 rounded-xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]" placeholder="your username" />
             </label>
             <label className="block">
               <span className="text-xs font-black tracking-widest text-black/60">PASSWORD</span>
               <div className="mt-1 relative">
-                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required className="w-full px-4 py-3 pr-12 rounded-xl bg-black/5 border border-black/10 outline-none focus:border-[#E30613]/40 text-sm" placeholder="••••••••" />
-                <button type="button" onClick={()=>setShow(v=>!v)} className="absolute right-1 top-1 bottom-1 w-10 grid place-items-center rounded-xl hover:bg-black/5">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>
+                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required className="w-full px-4 py-3 pr-12 rounded-xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]" placeholder="••••••••" />
+                <button type="button" onClick={()=>setShow(v=>!v)} className="absolute right-1 top-1 bottom-1 w-10 grid place-items-center rounded-xl hover:bg-black/5 text-zinc-500">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>
               </div>
             </label>
             <button disabled={loading} className="w-full py-3 rounded-full text-white text-sm font-black flex items-center justify-center gap-2 bg-[#E30613] hover:bg-[#FF2D3B] disabled:opacity-60">

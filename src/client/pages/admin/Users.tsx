@@ -158,15 +158,15 @@ export default function UsersPage(){
                 <div className="mt-5 space-y-4">
                   <label className="block">
                     <span className="text-xs font-black tracking-widest text-zinc-600">USERNAME</span>
-                    <input autoFocus placeholder="e.g. rahul123" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-[#F0F7FF] border-2 border-transparent focus:border-[#0066CC] focus:bg-white outline-none text-sm font-bold"/>
+                    <input autoFocus placeholder="e.g. rahul123" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm font-bold text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
                   </label>
                   <label className="block">
                     <span className="text-xs font-black tracking-widest text-zinc-600">PASSWORD</span>
-                    <input placeholder="•••••••• (min 6)" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-[#F0F7FF] border-2 border-transparent focus:border-[#0066CC] focus:bg-white outline-none text-sm"/>
+                    <input placeholder="•••••••• (min 6)" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
                   </label>
                   <label className="block">
                     <span className="text-xs font-black tracking-widest text-zinc-600">SUBSCRIPTION DAYS <span className="font-normal text-zinc-400 normal-case">— kitne din?</span></span>
-                    <input placeholder="30" type="number" value={form.sub_days} onChange={e=>setForm({...form, sub_days:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-[#F0F7FF] border-2 border-transparent focus:border-[#0066CC] focus:bg-white outline-none text-sm font-black"/>
+                    <input placeholder="30" type="number" value={form.sub_days} onChange={e=>setForm({...form, sub_days:e.target.value})} className="mt-1 w-full px-4 py-3 rounded-2xl bg-white border-2 border-zinc-200 outline-none focus:border-[#E30613] text-sm font-black text-[#0A1628] placeholder:text-zinc-400 caret-[#E30613]"/>
                     <div className="text-[11px] text-zinc-500 mt-1"><span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">0 = Lifetime</span> <span className="px-2 py-0.5 rounded-full bg-[#EAF4FF] font-bold">30 = 30 din</span></div>
                   </label>
                 </div>
