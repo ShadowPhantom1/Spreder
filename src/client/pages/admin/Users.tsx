@@ -24,8 +24,8 @@ export default function UsersPage(){
     const expires_at = days>0 ? new Date(Date.now()+days*24*60*60*1000).toISOString() : null
     setCreating(true)
     try{
-      await api.post('/api/admin/users', { username: form.username.trim(), password: form.password, per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at });
-      setMsg('✓ '+form.username+' created • '+ (days?days+' days':'lifetime')+' • IP auto on first login');
+      await api.post('/api/admin/users', { username: form.username.trim(), password: form.password, per_sim_limit:100, max_devices:100, expires_at });
+      setMsg('✓ '+form.username+' created • '+ (days?days+' days':'lifetime')+' • Device lock on first login');
       setForm({username:'', password:'', sub_days:'30'});
       setFormError('');
       setShowAdd(false);
@@ -34,7 +34,6 @@ export default function UsersPage(){
       let m=e.message||'Create failed'
       if(m.includes('Invalid token')||m.includes('Unauthorized')||m.includes('thwip')){
         m='Session expired — please login again at /super as admin'
-        // auto redirect after 1.5s
         setTimeout(()=> window.location.href='/super', 1500)
       }
       if(m.includes('Super admin only')) m='Super admin only — login at /super with admin credentials'
@@ -44,10 +43,10 @@ export default function UsersPage(){
   }
   const act=async(p:string,id:string)=>{ try{ await api.post(`/api/admin/users/${id}/${p}`); setMsg('✓ '+p); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')){ m='Session expired — re-login at /super'; setTimeout(()=> window.location.href='/super',1200)}; setMsg(m)} }
   const del=async(id:string)=>{ if(!confirm('Delete user + data?')) return; try{ await api.del(`/api/admin/users/${id}`); setMsg('✓ Deleted'); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')) m='Session expired — re-login at /super'; setMsg(m)} }
-  const save=async(id:string, per:number, ip:string)=>{ try{ await api.put(`/api/admin/users/${id}`, {per_sim_limit:per, allowed_ip:ip}); setMsg('✓ Saved'); setEditing(null); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')) m='Session expired — re-login at /super'; setMsg(m)} }
+  const save=async(id:string, per:number)=>{ try{ await api.put(`/api/admin/users/${id}`, {per_sim_limit:per}); setMsg('✓ Saved'); setEditing(null); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')) m='Session expired — re-login at /super'; setMsg(m)} }
 
   const filtered = users.filter((u:any)=>{
-    if(q && !u.username.toLowerCase().includes(q.toLowerCase()) && !(u.allowed_ip||'').includes(q)) return false
+    if(q && !u.username.toLowerCase().includes(q.toLowerCase())) return false
     if(filter==='active' && !u.is_active) return false
     if(filter==='disabled' && u.is_active) return false
     if(filter==='super' && !u.is_super) return false
@@ -60,7 +59,7 @@ export default function UsersPage(){
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-black text-lg flex items-center gap-2"><Users size={18} className="text-[#0066CC]"/> User Management <span className="px-2.5 py-1 rounded-full bg-[#0066CC] text-white text-xs font-black">{filtered.length}</span></h2>
-          <p className="text-xs text-zinc-500">Add via popup • First login IP auto-lock • 1 ID 1 device • Super only • /adminbhnstock</p>
+          <p className="text-xs text-zinc-500">Add via popup • Device lock on first login • 1 ID 1 device • Super only • /adminbhnstock</p>
         </div>
         <button onClick={()=>setShowAdd(true)} className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#E30613] to-[#9A0007] text-white font-black flex items-center gap-2 shadow-[0_8px_22px_rgba(227,6,19,0.35)] hover:shadow-xl"><UserPlus size={18}/> Add User</button>
       </div>
@@ -75,7 +74,7 @@ export default function UsersPage(){
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-              <input placeholder="Search username or IP" value={q} onChange={e=>setQ(e.target.value)} className="pl-9 pr-3 py-2.5 rounded-full bg-[#F8FBFF] border border-[#EAF4FF] focus:border-[#0066CC] outline-none text-sm w-64"/>
+              <input placeholder="Search username" value={q} onChange={e=>setQ(e.target.value)} className="pl-9 pr-3 py-2.5 rounded-full bg-[#F8FBFF] border border-[#EAF4FF] focus:border-[#0066CC] outline-none text-sm w-64"/>
             </div>
           </div>
         </div>
@@ -83,7 +82,7 @@ export default function UsersPage(){
         <div className="overflow-x-auto mt-4 rounded-2xl border border-[#F0F7FF]">
           <table className="w-full text-sm">
             <thead className="bg-[#F0F7FF] text-[#0A1628] text-xs font-black tracking-widest">
-              <tr><th className="text-left p-3.5">USER</th><th className="p-3.5 text-left">IP / DEVICE LOCK</th><th className="p-3.5">LIMIT</th><th className="p-3.5">EXPIRY</th><th className="p-3.5">STATUS</th><th className="p-3.5">SESSION</th><th className="p-3.5 text-right">ACTIONS</th></tr>
+              <tr><th className="text-left p-3.5">USER</th><th className="p-3.5 text-left">DEVICE LOCK</th><th className="p-3.5">LIMIT</th><th className="p-3.5">EXPIRY</th><th className="p-3.5">STATUS</th><th className="p-3.5">SESSION</th><th className="p-3.5 text-right">ACTIONS</th></tr>
             </thead>
             <tbody>
               {filtered.map((u:any)=>(
@@ -95,14 +94,8 @@ export default function UsersPage(){
                     </div>
                   </td>
                   <td className="p-3">
-                    {editing===u.id ? (
-                      <input autoFocus defaultValue={u.allowed_ip||''} id={`ip-${u.id}`} placeholder="auto" className="px-3 py-1.5 rounded-xl bg-white border-2 border-[#0066CC] text-xs w-32 outline-none"/>
-                    ) : (
-                      <div onClick={()=>setEditing(u.id)} className="cursor-pointer px-3 py-1.5 rounded-xl bg-[#F0F7FF] border border-[#EAF4FF] text-xs font-mono hover:border-[#0066CC]">
-                        {u.allowed_ip || '— auto —'}
-                      </div>
-                    )}
-                    <div className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1"><Lock size={10}/>{u.allowed_device?u.allowed_device.slice(0,18):'first-login lock'}</div>
+                    <div className="text-[11px] text-zinc-500 flex items-center gap-1"><Lock size={10}/>{u.allowed_device?u.allowed_device.slice(0,24):'— first login lock —'}</div>
+                    <div className="text-xs font-mono text-zinc-600">{u.allowed_device ? '1 device only' : 'any device (not yet locked)'}</div>
                   </td>
                   <td className="p-3">
                     {editing===u.id ? (
@@ -119,7 +112,7 @@ export default function UsersPage(){
                     <div className="flex justify-end gap-1">
                       {editing===u.id ? (
                         <>
-                          <button onClick={()=>{ const ip=(document.getElementById(`ip-${u.id}`) as HTMLInputElement).value; const per=parseInt((document.getElementById(`per-${u.id}`) as HTMLInputElement).value||'100'); save(u.id, per, ip)}} className="px-3 py-1.5 rounded-xl bg-[#0066CC] text-white font-black text-xs">Save</button>
+                          <button onClick={()=>{ const per=parseInt((document.getElementById(`per-${u.id}`) as HTMLInputElement).value||'100'); save(u.id, per)}} className="px-3 py-1.5 rounded-xl bg-[#0066CC] text-white font-black text-xs">Save</button>
                           <button onClick={()=>setEditing(null)} className="px-3 py-1.5 rounded-xl bg-zinc-100 font-bold text-xs">Cancel</button>
                         </>
                       ) : (
@@ -127,7 +120,7 @@ export default function UsersPage(){
                           <button onClick={()=>setEditing(u.id)} className="p-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0066CC] hover:text-white text-[#0066CC]"><Eye size={14}/></button>
                           {u.is_active? <button onClick={()=>act('disable',u.id)} className="p-2 rounded-xl bg-amber-100 hover:bg-amber-500 hover:text-white text-amber-700"><Ban size={14}/></button>: <button onClick={()=>act('enable',u.id)} className="p-2 rounded-xl bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700"><Power size={14}/></button>}
                           <button onClick={()=>act('kick',u.id)} className="p-2 rounded-xl bg-zinc-800 hover:bg-black text-white"><LogOut size={14}/></button>
-                          <button onClick={async()=>{ if(confirm('Revoke IP/Device? Next login new lock.')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="px-2.5 py-2 rounded-xl bg-[#0066CC] text-white font-black text-xs">Revoke</button>
+                          <button onClick={async()=>{ if(confirm('Revoke Device? Next login new device lock.')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="px-2.5 py-2 rounded-xl bg-[#0066CC] text-white font-black text-xs">Revoke</button>
                           <button onClick={()=>del(u.id)} className="p-2 rounded-xl bg-red-50 hover:bg-red-600 hover:text-white text-red-600"><Trash2 size={14}/></button>
                         </>
                       )}
@@ -151,7 +144,7 @@ export default function UsersPage(){
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#E30613] to-[#9A0007] grid place-items-center text-white"><UserPlus size={18}/></div>
-                    <div><h2 className="font-black text-lg leading-none">New User</h2><p className="text-xs text-zinc-500">Add to MongoDB • auto IP on first login</p></div>
+                    <div><h2 className="font-black text-lg leading-none">New User</h2><p className="text-xs text-zinc-500">Add to MongoDB • device lock on first login</p></div>
                   </div>
                   <button onClick={()=>setShowAdd(false)} className="w-9 h-9 rounded-full bg-[#F0F7FF] grid place-items-center hover:bg-zinc-100">✕</button>
                 </div>
@@ -173,7 +166,7 @@ export default function UsersPage(){
                 {formError && <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 font-bold">⚠️ {formError}</div>}
                 <div className="mt-4 p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 flex gap-3">
                   <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white grid place-items-center shrink-0"><Lock size={14}/></div>
-                  <div className="text-xs leading-relaxed"><b>Auto IP lock:</b> User pehli baar login karega → IP + Device auto save → 1 ID 2 device block. <b>Revoke</b> se naya lock.</div>
+                  <div className="text-xs leading-relaxed"><b>Device lock:</b> User pehli baar login karega → device auto-save → 1 ID 2 device block. <b>Revoke</b> se naya device.</div>
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={()=>setShowAdd(false)} className="flex-1 py-3 rounded-2xl bg-[#F0F7FF] border border-[#EAF4FF] font-black">Cancel</button>

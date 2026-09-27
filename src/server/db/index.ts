@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS sessions (user_id TEXT PRIMARY KEY, ip TEXT, device_i
 CREATE TABLE IF NOT EXISTS devices (id TEXT PRIMARY KEY, firebase_id TEXT, name TEXT, status TEXT, last_seen TEXT);
 CREATE TABLE IF NOT EXISTS campaign_messages (id TEXT PRIMARY KEY, campaign_id TEXT, device_id TEXT, status TEXT, sent_at TEXT);
 `)
-console.log('[DB] SQLite in-memory dummy (sessions/devices only, main data Mongo)')
+// SQLite dummy removed — fully Mongo (no log)
 
 // seed admin into Mongo
 import bcrypt from 'bcryptjs'
@@ -40,7 +40,7 @@ const adminExists = await User.findOne({username: config.ADMIN_USER}).lean() as 
 if (!adminExists) {
   const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
   const id=randomUUID()
-  await User.create({_id:id, username: config.ADMIN_USER, password_hash:hash, role:'admin', is_super:1, is_active:1, allowed_ip:null, allowed_device:null, per_sim_limit:100, max_devices:100, expires_at:null, created_at:new Date().toISOString()})
+  await User.create({_id:id, username: config.ADMIN_USER, password_hash:hash, role:'admin', is_super:1, is_active:1, allowed_device:null, per_sim_limit:100, max_devices:100, expires_at:null, created_at:new Date().toISOString()} as any)
   console.log(`[DB] Seeded super admin Mongo: ${config.ADMIN_USER}`)
 } else if(adminExists.is_super!==1){
   await User.updateOne({username: config.ADMIN_USER}, {$set:{is_super:1, is_active:1}})

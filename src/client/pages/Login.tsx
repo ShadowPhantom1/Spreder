@@ -31,7 +31,7 @@ export default function Login(){
       if(!res.ok) {
         let m = data?.error || `Login failed (${res.status})`
         if(m.includes('Device not allowed')) m = 'Device locked — yeh ID pehle device se lock hai. Admin se bolo /adminbhnstock → Users → Revoke kare, phir new device se login hoga.'
-        if(m.includes('IP not allowed')) m = m + ' — Admin ne IP lock kiya hai. Revoke karwana padega.'
+        if(m.includes('IP not allowed')) m = 'IP check removed — kahi se bhi login ho sakta hai, lock hata diya gaya hai.'
         throw new Error(m)
       }
       if(data.token) localStorage.setItem('token', data.token)
@@ -79,7 +79,7 @@ export default function Login(){
           </div>
         </form>
 
-        <p className="text-center text-[10px] tracking-widest text-white/30 mt-4">© 2026 BHNSTOCK • SECURE ACCESS • ONE DEVICE ONE IP</p>
+        <p className="text-center text-[10px] tracking-widest text-white/30 mt-4">© 2026 BHNSTOCK • SECURE ACCESS • ONE DEVICE</p>
       </div>
     </div>
   )

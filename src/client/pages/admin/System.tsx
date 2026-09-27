@@ -45,7 +45,7 @@ export default function SystemPage(){
         <div className="grid md:grid-cols-3 gap-3 mt-4">
           {[
             {k:'DB', v:'MongoDB (Cluster0)', d:'FULLY Mongo • in-memory dummy for sessions'},
-            {k:'Auth', v:'1 ID 1 Device', d:'First-login IP+device auto-lock • Revoke → new lock'},
+            {k:'Auth', v:'1 ID 1 Device', d:'First-login device auto-lock • Revoke → new lock • IP free'},
             {k:'Speed', v:stats?.devices?.capacity?.perSim ? `${stats.devices.capacity.perSim}/SIM` : '100/SIM', d:'Ultra 0.08x • per-slot equal load'},
           ].map(x=>(
             <div key={x.k} className="p-4 rounded-2xl bg-[#F8FBFF] border border-[#EAF4FF]">

@@ -69,7 +69,7 @@ export default function AdminLayout(){
             <div className="relative">
               <div className="flex items-center gap-2 text-[11px] font-black tracking-[0.16em] opacity-90"><Sparkles size={12}/> SPIDER ADMIN</div>
               <div className="font-black text-xl leading-none mt-1">With Great<br/>Power</div>
-              <div className="text-xs text-white/75 mt-1 leading-relaxed">Users • Security • System • Hives<br/>One device • One IP • Thwip!</div>
+              <div className="text-xs text-white/75 mt-1 leading-relaxed">Users • Security • System • Hives<br/>One device • Thwip!</div>
               <div className="mt-4 flex gap-2">
                 <span className="px-2.5 py-1 rounded-full bg-white text-[#E30613] text-xs font-black shadow">{users.length} USERS</span>
                 <span className="px-2.5 py-1 rounded-full bg-[#FFD23F] text-[#0A1628] text-xs font-black">{active} ACTIVE</span>
@@ -81,7 +81,7 @@ export default function AdminLayout(){
             {[
               {to:'/adminbhnstock', l:'Dashboard', d:'Stats & health', i:BarChart3, end:true},
               {to:'/adminbhnstock/users', l:'Users', d:'Create, edit, revoke', i:Users},
-              {to:'/adminbhnstock/security', l:'Security', d:'IP / Device logs', i:Lock},
+              {to:'/adminbhnstock/security', l:'Security', d:'Device logs', i:Lock},
               {to:'/adminbhnstock/system', l:'System', d:'Storage & hives', i:Settings},
             ].map(n=>(
               <NavLink key={n.to} to={n.to} end={(n as any).end} className={({isActive})=>`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border text-left transition ${isActive?'bg-[#E30613] text-white border-[#E30613] shadow-[0_8px_22px_rgba(227,6,19,0.35)]':'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08] hover:border-white/15 text-white/85'}`}>
@@ -94,7 +94,7 @@ export default function AdminLayout(){
           <div className="mt-auto p-4 rounded-2xl bg-white/[0.05] border border-white/10 backdrop-blur">
             <div className="flex items-center gap-2 text-xs font-black text-[#FFD23F]"><Zap size={14}/> Spidey Rules</div>
             <ul className="mt-2 space-y-1.5 text-xs text-white/70">
-              <li className="flex gap-2">✓ First-login IP auto-lock</li>
+              <li className="flex gap-2">✓ First-login device auto-lock</li>
               <li className="flex gap-2">✓ 1 ID 1 device enforced</li>
               <li className="flex gap-2">✓ Revoke = new web</li>
             </ul>

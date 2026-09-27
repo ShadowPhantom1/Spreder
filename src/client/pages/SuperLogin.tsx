@@ -94,7 +94,7 @@ export default function SuperLogin(){
 
         <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center gap-3 backdrop-blur">
           <div className="w-10 h-10 rounded-xl bg-[#FFD23F] grid place-items-center font-black text-[#0A1628]">!</div>
-          <div className="text-xs leading-relaxed text-white/70"><b className="text-white">One Device • One IP</b> — first login locks IP+Device. Revoke to allow new device. Super only via <b className="text-[#FFD23F]">/adminbhnstock</b> or <b className="text-[#FFD23F]">/super</b>.</div>
+          <div className="text-xs leading-relaxed text-white/70"><b className="text-white">One Device</b> — first login locks device. Revoke to allow new device. Super only via <b className="text-[#FFD23F]">/adminbhnstock</b> or <b className="text-[#FFD23F]">/super</b>.</div>
         </div>
         <p className="text-center text-[10px] tracking-widest text-white/30 mt-4">© 2026 BHNSTOCK • SPIDER ADMIN • WITH GREAT POWER</p>
       </div>

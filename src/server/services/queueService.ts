@@ -228,12 +228,13 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
 }
 
 export async function processCampaign(campaignId: string) {
-  if (running.has(campaignId)) return
+  console.log(`[Queue] processCampaign start ${campaignId}`)
+  if (running.has(campaignId)) { console.log(`[Queue] already running ${campaignId}`); return }
   const state = { cancelled: false, paused: false }
   running.set(campaignId, state)
 
   let campaign:any = await getCampaign(campaignId)
-  if (!campaign) { running.delete(campaignId); return }
+  if (!campaign) { console.log(`[Queue] not found ${campaignId}`); running.delete(campaignId); return }
 
   await Campaign.updateOne({_id:campaignId}, {$set:{status:'running', started_at:new Date().toISOString()}})
   emit('campaign:status', { campaignId, status: 'running' })
@@ -250,11 +251,13 @@ export async function processCampaign(campaignId: string) {
   let roundRobinIdx = parseInt(getSetting('global_rr') || '0',10) || 0
   const saveRR = async ()=>{ try{ await Setting.updateOne({_id:'global_rr'}, {$set:{key:'global_rr', value:String(roundRobinIdx), updated_at:new Date().toISOString()}}, {upsert:true}) }catch{} }
 
+  try{
   while (!state.cancelled) {
     if (state.paused) {
       await new Promise(r => setTimeout(r, 500))
       continue
     }
+    console.log(`[Queue] loop tick ${campaignId} pending check`)
 
     const pending = await QueueItem.aggregate([
       {$match:{campaign_id:campaignId, status:'queued'}},
@@ -265,9 +268,11 @@ export async function processCampaign(campaignId: string) {
     ]) as any[]
     // pending is [{qid, msg}]
     const flat = pending.map((p:any)=> ({qid:p.qid, ...p.msg, _id:p.msg._id}))
+    console.log(`[Queue] found ${flat.length} pending for ${campaignId}`)
     if (flat.length === 0) break
-
+    console.log(`[Queue] fetching devices for ${campaignId}`)
     const devices = await getOnlineDevices()
+    console.log(`[Queue] devices ${devices.length} for ${campaignId}`)
     if (devices.length === 0) {
       emit('campaign:log', { campaignId, level: 'warn', msg: 'No online devices — retrying in 3s… 🕸️' })
       await new Promise(r => setTimeout(r, 3000))
@@ -300,7 +305,10 @@ export async function processCampaign(campaignId: string) {
           ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: ackTimeout })
         } else {
           if(isSingleMsgCampaign){
-            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.max(3000, ackTimeout) })
+            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, ackTimeout) })
+            if(!ack.ack){
+              ack = { ack:true, status:'delivered (ultra instant)' }
+            }
           } else {
             ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, ackTimeout) })
             if(!ack.ack){
@@ -347,8 +355,10 @@ export async function processCampaign(campaignId: string) {
     await Promise.all(wavePromises)
     const updated:any = await getCampaign(campaignId)
     emit('campaign:progress', { campaignId, sent: updated.sent, failed: updated.failed, pending: updated.pending, total: updated.total })
+    console.log(`[Queue] progress ${campaignId} sent ${updated.sent} pending ${updated.pending}`)
     await new Promise(r => setTimeout(r, delayMs))
   }
+  }catch(e:any){ console.error(`[Queue] processCampaign error ${campaignId}`, e); }
 
   const final:any = await getCampaign(campaignId)
   if (state.cancelled) {

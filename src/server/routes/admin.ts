@@ -17,7 +17,7 @@ r.get('/users', async (req,res)=>{
       const docs=await User.find().sort({created_at:-1}).lean() as any
       users=docs.map((d:any)=>({ ...d, id:d._id, _id:d._id }))
     } else {
-      users = db.prepare('SELECT id, username, role, is_super, is_active, allowed_ip, allowed_device, per_sim_limit, max_devices, expires_at, created_at FROM users ORDER BY created_at DESC').all() as any[]
+      users = db.prepare('SELECT id, username, role, is_super, is_active, allowed_device, per_sim_limit, max_devices, expires_at, created_at FROM users ORDER BY created_at DESC').all() as any[]
     }
     const enriched = await Promise.all(users.map(async (u:any)=>{
       let devC=0, campsC=0
@@ -45,9 +45,9 @@ r.get('/users', async (req,res)=>{
   }catch(e:any){ console.error('[admin users] err',e); res.status(500).json({error:e.message})}
 })
 
-// create user — fully Mongo
+// create user — fully Mongo — IP system removed, kahi se bhi login
 r.post('/users', async (req,res)=>{
-  const { username, password, per_sim_limit=100, max_devices=100, allowed_ip='', expires_at } = req.body
+  const { username, password, per_sim_limit=100, max_devices=100, expires_at } = req.body
   if(!username || !password) return res.status(400).json({error:'username/password required'})
   if(useMongo){
     const User=mongoose.model('User')
@@ -56,21 +56,21 @@ r.post('/users', async (req,res)=>{
     const id=randomUUID()
     const hash=await bcrypt.hash(password,10)
     const now=new Date().toISOString()
-    await User.create({_id:id, username, password_hash:hash, role:'user', is_super:0, is_active:1, allowed_ip:allowed_ip||null, allowed_device:null, per_sim_limit, max_devices, expires_at:expires_at||null, created_at:now})
+    await User.create({_id:id, username, password_hash:hash, role:'user', is_super:0, is_active:1, allowed_device:null, per_sim_limit, max_devices, expires_at:expires_at||null, created_at:now} as any)
     return res.json({id, username})
   } else {
     if(db.prepare('SELECT id FROM users WHERE username=?').get(username)) return res.status(400).json({error:'exists'})
     const id=randomUUID()
     const hash=await bcrypt.hash(password,10)
     const now=new Date().toISOString()
-    db.prepare('INSERT INTO users (id, username, password_hash, role, is_super, is_active, allowed_ip, per_sim_limit, max_devices, expires_at, created_at) VALUES (?,?,?,?,0,1,?,?,?,?,?)').run(id, username, hash, 'user', allowed_ip||null, per_sim_limit, max_devices, expires_at||null, now)
+    db.prepare('INSERT INTO users (id, username, password_hash, role, is_super, is_active, per_sim_limit, max_devices, expires_at, created_at) VALUES (?,?,?,?,0,1,?,?,?,?)').run(id, username, hash, 'user', per_sim_limit, max_devices, expires_at||null, now)
     return res.json({id, username})
   }
 })
 
-// edit user (limit, ip, expiry) — fully Mongo
+// edit user (limit, expiry) — IP removed
 r.put('/users/:id', async (req,res)=>{
-  const { per_sim_limit, max_devices, allowed_ip, expires_at } = req.body
+  const { per_sim_limit, max_devices, expires_at } = req.body
   if(useMongo){
     const User=mongoose.model('User')
     const u=await User.findOne({_id:req.params.id}).lean() as any
@@ -78,14 +78,13 @@ r.put('/users/:id', async (req,res)=>{
     const upd:any={}
     if(per_sim_limit!=null) upd.per_sim_limit=per_sim_limit
     if(max_devices!=null) upd.max_devices=max_devices
-    if(allowed_ip!==undefined) upd.allowed_ip=allowed_ip
     if(expires_at!==undefined) upd.expires_at=expires_at
     await User.updateOne({_id:req.params.id}, {$set:upd})
     return res.json({ok:true})
   } else {
     const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id) as any
     if(!u) return res.status(404).json({error:'not found'})
-    db.prepare('UPDATE users SET per_sim_limit=COALESCE(?,per_sim_limit), max_devices=COALESCE(?,max_devices), allowed_ip=COALESCE(?,allowed_ip), expires_at=COALESCE(?,expires_at) WHERE id=?').run(per_sim_limit??null, max_devices??null, allowed_ip??null, expires_at??null, req.params.id)
+    db.prepare('UPDATE users SET per_sim_limit=COALESCE(?,per_sim_limit), max_devices=COALESCE(?,max_devices), expires_at=COALESCE(?,expires_at) WHERE id=?').run(per_sim_limit??null, max_devices??null, expires_at??null, req.params.id)
     return res.json({ok:true})
   }
 })
@@ -125,13 +124,14 @@ r.post('/users/:id/kick', async (req,res)=>{
   try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id) }catch{}
   res.json({ok:true})
 })
-// reset device/IP lock (for first-login lock) — fully Mongo
+// reset device lock (IP system removed) — fully Mongo
 r.post('/users/:id/reset-lock', async (req,res)=>{
   if(useMongo){
     const User=mongoose.model('User')
-    await User.updateOne({_id:req.params.id}, {$set:{allowed_ip:null, allowed_device:null}})
+    await User.updateOne({_id:req.params.id}, {$set:{allowed_device:null}, $unset:{allowed_ip:""} as any})
   } else {
-    db.prepare('UPDATE users SET allowed_ip=NULL, allowed_device=NULL WHERE id=?').run(req.params.id)
+    db.prepare('UPDATE users SET allowed_device=NULL WHERE id=?').run(req.params.id)
+    try{ db.prepare('UPDATE users SET allowed_ip=NULL WHERE id=?').run(req.params.id)}catch{}
   }
   try{
     const {Session} = await import('../db/index.js')
@@ -139,7 +139,7 @@ r.post('/users/:id/reset-lock', async (req,res)=>{
     await Session.deleteOne({user_id:req.params.id} as any)
   }catch{}
   try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.params.id) }catch{}
-  res.json({ok:true, msg:'Lock reset — next login will lock to new device/IP'})
+  res.json({ok:true, msg:'Lock reset — next login will lock to new device (IP free)'})
 })
 // delete user + wipe data — fully Mongo
 r.delete('/users/:id', async (req,res)=>{

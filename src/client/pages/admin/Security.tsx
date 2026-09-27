@@ -5,11 +5,12 @@ export default function Security(){
       <h2 className="font-black text-lg flex items-center gap-2"><Shield size={18} className="text-[#0066CC]"/> Security Center</h2>
       <div className="grid md:grid-cols-2 gap-4">
         <div className="rounded-[20px] bg-white p-6 border border-[#EAF4FF] shadow-sm">
-          <h3 className="font-black flex items-center gap-2"><Lock size={18} className="text-[#0066CC]"/> IP & Device Lock</h3>
+          <h3 className="font-black flex items-center gap-2"><Lock size={18} className="text-[#0066CC]"/> Device Lock</h3>
           <ul className="mt-4 space-y-3 text-sm">
-            <li className="p-3 rounded-xl bg-[#F0F7FF] border"><b>First login</b> — IP + device fingerprint auto save, next login only same device</li>
+            <li className="p-3 rounded-xl bg-[#F0F7FF] border"><b>First login</b> — device fingerprint auto save, next login only same device</li>
             <li className="p-3 rounded-xl bg-[#F0F7FF] border"><b>Revoke</b> — Super can reset → next login new device</li>
             <li className="p-3 rounded-xl bg-[#F0F7FF] border"><b>Session</b> — 1 user = 1 token, 1 device, kick old</li>
+            <li className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700"><b>IP check removed</b> — kahi se bhi login, sirf device lock</li>
           </ul>
         </div>
         <div className="rounded-[20px] bg-gradient-to-br from-[#EAF4FF] to-white p-6 border border-[#EAF4FF]">

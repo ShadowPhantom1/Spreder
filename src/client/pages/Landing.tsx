@@ -56,7 +56,7 @@ export default function Landing(){
           <div className="rounded-2xl bg-[#E30613] text-white p-4">
             <Shield size={20}/>
             <div className="font-black mt-2">Secure</div>
-            <div className="text-sm text-white/80">IP + Device Lock</div>
+            <div className="text-sm text-white/80">Device Lock</div>
             <div className="text-2xl font-black mt-4">100%</div>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function Landing(){
       <section id="features" className="max-w-6xl mx-auto px-4 pb-16 grid md:grid-cols-3 gap-4">
         {[
           {t:'For Users',d:'Add your own Firebase, manage devices, launch campaigns — isolated per account.'},
-          {t:'For Super Admin',d:'View all users, manage limits, IP lock, sessions — Nivea 3D theme.'},
+          {t:'For Super Admin',d:'View all users, manage limits, device lock, sessions — Spidey theme.'},
           {t:'Built for Scale',d:'Per-slot load, validated bots only, auto 3-day cleanup — no drops.'},
         ].map(f=>(
           <div key={f.t} className="rounded-2xl bg-white/5 border border-white/10 p-5">

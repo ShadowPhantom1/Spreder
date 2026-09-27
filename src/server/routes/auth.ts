@@ -28,9 +28,10 @@ async function getUserById(id:string){
 async function updateUserLock(id:string, ip:string, deviceId:string){
   if(useMongo){
     const User=mongoose.model('User')
-    await User.updateOne({_id:id}, {$set:{allowed_ip:ip, allowed_device:deviceId}})
+    await User.updateOne({_id:id}, {$set:{allowed_device:deviceId}, $unset:{allowed_ip:""}} as any)
   } else {
-    db.prepare('UPDATE users SET allowed_ip=?, allowed_device=? WHERE id=?').run(ip, deviceId, id)
+    // SQLite: keep column for compat but null it (fully Mongo now, SQLite is in-memory dummy)
+    try{ db.prepare('UPDATE users SET allowed_device=? , allowed_ip=NULL WHERE id=?').run(deviceId, id) }catch{}
   }
 }
 
@@ -44,26 +45,14 @@ router.post('/login', async (req, res) => {
   if(user.expires_at && new Date(user.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
   const deviceId = (req.headers['x-device-id'] as string) || req.headers['user-agent']?.slice(0,80) || 'web'
-  // FIRST LOGIN auto-lock: agar allowed_ip/device khali hai to isi ip/device pe lock kar de
-  if((!user.allowed_ip || user.allowed_ip==='') && (!user.allowed_device || user.allowed_device==='')){
-    // super admin ko auto-lock nahi
+  // FIRST LOGIN auto-lock: only device lock, IP system removed — kahi se bhi login
+  if(!user.allowed_device || user.allowed_device===''){
     if(user.is_super!==1){
       await updateUserLock(user.id, ip, deviceId)
-      user.allowed_ip = ip
       user.allowed_device = deviceId
-      console.log(`[Auth] First login lock ${user.username} → IP ${ip} Device ${deviceId.slice(0,20)}`)
+      console.log(`[Auth] First login device lock ${user.username} → Device ${deviceId.slice(0,20)}`)
     }
   } else {
-    // check IP
-    if(user.allowed_ip && user.allowed_ip!=='*' && user.allowed_ip!==''){
-      if(user.allowed_ip.includes('/')){
-        const base=user.allowed_ip.split('/')[0]
-        if(!ip.startsWith(base.slice(0, base.lastIndexOf('.')))) return res.status(403).json({ error: `IP not allowed (${ip})` })
-      } else if(ip!==user.allowed_ip){
-        if(!ip.includes('127.0.0.1') && ip!=='' ) return res.status(403).json({ error: `IP not allowed (${ip})` })
-      }
-    }
-    // check device
     if(user.allowed_device && user.allowed_device!=='*' && user.allowed_device!==''){
       if(deviceId !== user.allowed_device) return res.status(403).json({ error: `Device not allowed` })
     }

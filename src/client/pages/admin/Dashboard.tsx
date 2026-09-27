@@ -34,7 +34,7 @@ export default function Dashboard(){
               <div key={u.id} className="flex items-center justify-between p-3 rounded-2xl bg-[#F8FBFF] border border-[#EAF4FF]">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0066CC] to-[#1E40AF] text-white grid place-items-center font-black">{u.username[0].toUpperCase()}</div>
-                  <div><div className="font-bold text-sm flex items-center gap-1.5">{u.username} {u.is_super && <span className="px-1.5 py-0.5 rounded-full bg-[#0066CC] text-white text-[10px] font-black">SUPER</span>} {u.session && <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"/>}</div><div className="text-xs text-zinc-500">{u.is_active?'Active':'Disabled'} • {u.per_sim_limit}/SIM • {u.allowed_ip || 'IP auto'}</div></div>
+                  <div><div className="font-bold text-sm flex items-center gap-1.5">{u.username} {u.is_super && <span className="px-1.5 py-0.5 rounded-full bg-[#0066CC] text-white text-[10px] font-black">SUPER</span>} {u.session && <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"/>}</div><div className="text-xs text-zinc-500">{u.is_active?'Active':'Disabled'} • {u.per_sim_limit}/SIM • {u.allowed_device ? 'Device locked' : 'No lock'}</div></div>
                 </div>
                 <div className="text-right"><div className="text-xs font-bold">{u.expires_at? new Date(u.expires_at).toLocaleDateString(): '∞'}</div><div className="text-[11px] text-zinc-400">{new Date(u.created_at).toLocaleDateString()}</div></div>
               </div>
@@ -59,7 +59,7 @@ export default function Dashboard(){
               <a href="/adminbhnstock/users" className="py-2.5 rounded-xl bg-white text-[#0066CC] font-black text-sm text-center">Manage Users</a>
               <button onClick={()=>location.reload()} className="py-2.5 rounded-xl bg-white/15 border border-white/20 font-bold text-sm">Refresh</button>
             </div>
-            <p className="text-xs text-white/60 mt-3">Add user → first login auto IP lock → revoke → new device</p>
+            <p className="text-xs text-white/60 mt-3">Add user → first login auto device lock → revoke → new device</p>
           </div>
         </div>
       </div>
