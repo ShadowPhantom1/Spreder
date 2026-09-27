@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 export default function Admin(){
   const [users,setUsers]=useState<any[]>([])
   const [stats,setStats]=useState<any>(null)
-  const [form,setForm]=useState({username:'', password:'', per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at:''})
+  const [form,setForm]=useState({username:'', password:'', sub_days:'30'})
   const [msg,setMsg]=useState('')
   const [tab,setTab]=useState<'dash'|'users'|'sec'|'sys'>('dash')
   const [q,setQ]=useState('')
@@ -29,7 +29,9 @@ export default function Admin(){
 
   const create=async()=>{
     if(!form.username || !form.password) return setMsg('Username & password required')
-    try{ await api.post('/api/admin/users', form); setMsg('✓ '+form.username+' created'); setForm({username:'', password:'', per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at:''}); load()}catch(e:any){ setMsg(e.message)}
+    const days=parseInt(form.sub_days||'0',10)
+    const expires_at = days>0 ? new Date(Date.now()+days*24*60*60*1000).toISOString() : null
+    try{ await api.post('/api/admin/users', { username: form.username, password: form.password, per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at }); setMsg('✓ '+form.username+' created • '+ (days?days+' days':'lifetime')+' • IP auto on first login'); setForm({username:'', password:'', sub_days:'30'}); setShowAdd(false); load()}catch(e:any){ setMsg(e.message)}
   }
   const act=async(p:string,id:string)=>{ try{ await api.post(`/api/admin/users/${id}/${p}`); load()}catch(e:any){ setMsg(e.message)} }
   const del=async(id:string)=>{ if(!confirm('Delete user + data?')) return; try{ await api.del(`/api/admin/users/${id}`); load()}catch(e:any){ setMsg(e.message)} }
@@ -165,19 +167,19 @@ export default function Admin(){
                   <button onClick={()=>setShowAdd(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center">✕</button>
                 </div>
                 <p className="text-xs text-zinc-500 mt-1">Fill and Create → auto save to <b>Mongo</b> (if URI) + <b>local DB</b> fallback</p>
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  <label className="col-span-2"><span className="text-xs font-bold">Username</span><input placeholder="username" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
-                  <label className="col-span-2"><span className="text-xs font-bold">Password</span><input placeholder="password" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
-                  <label><span className="text-xs font-bold">Per SIM</span><input type="number" value={form.per_sim_limit} onChange={e=>setForm({...form, per_sim_limit:parseInt(e.target.value)||100})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
-                  <label><span className="text-xs font-bold">Max Devices</span><input type="number" value={form.max_devices} onChange={e=>setForm({...form, max_devices:parseInt(e.target.value)||100})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
-                  <label><span className="text-xs font-bold">Allowed IP</span><input placeholder="* or 1.2.3.4" value={form.allowed_ip} onChange={e=>setForm({...form, allowed_ip:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
-                  <label><span className="text-xs font-bold">Expiry</span><input type="date" value={form.expires_at} onChange={e=>setForm({...form, expires_at:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm"/></label>
+                <div className="grid grid-cols-1 gap-3 mt-4">
+                  <label><span className="text-xs font-bold">Username</span><input placeholder="e.g. rahul123" value={form.username} onChange={e=>setForm({...form, username:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
+                  <label><span className="text-xs font-bold">Password</span><input placeholder="••••••••" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/></label>
+                  <label><span className="text-xs font-bold">Subscription Days <span className="font-normal text-zinc-500">(kitne din ka)</span></span><input placeholder="30" type="number" value={form.sub_days} onChange={e=>setForm({...form, sub_days:e.target.value})} className="mt-1 w-full px-3 py-2.5 rounded-xl bg-[#EAF4FF] border border-[#BFDBFF] text-sm outline-none focus:border-[#0066CC]"/><div className="text-[11px] text-zinc-500">0 = lifetime • 30 = 30 din baad expire</div></label>
                 </div>
-                <div className="flex gap-3 mt-6">
+                <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+                  <b>IP auto:</b> User jab pehli baar `username/pass` se login karega → uska IP + device auto admin me save ho jayega → fir 1 ID 2 devices pe nahi chalega. <b>Revoke</b> dabane pe lock hat jayega, next login pe naya IP set.
+                </div>
+                <div className="flex gap-3 mt-4">
                   <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl bg-zinc-100 font-bold">Cancel</button>
-                  <button onClick={async()=>{ await create(); setShowAdd(false)}} className="flex-1 py-2.5 rounded-xl bg-[#0066CC] text-white font-black">Create → Mongo + SQL</button>
+                  <button onClick={create} className="flex-1 py-2.5 rounded-xl bg-[#0066CC] text-white font-black">Create User</button>
                 </div>
-                <div className="mt-3 text-xs text-center text-zinc-500">URI hai to <b>MongoDB</b> + local, nahi to <b>SQLite fallback</b></div>
+                <div className="mt-3 text-xs text-center text-zinc-500">Mongo + SQLite dual — auto save</div>
               </motion.div>
             </div>
           )}
@@ -238,8 +240,8 @@ export default function Admin(){
                             save(u.id, per, ip)
                           }} className="p-1.5 rounded-lg bg-[#0066CC] text-white hover:bg-[#0052A3]"><Save size={14}/></button>
                           {u.is_active? <button onClick={()=>act('disable',u.id)} className="p-1.5 rounded-lg bg-amber-500 text-white"><Ban size={14}/></button>: <button onClick={()=>act('enable',u.id)} className="p-1.5 rounded-lg bg-emerald-600 text-white"><Power size={14}/></button>}
-                          <button onClick={()=>act('kick',u.id)} className="p-1.5 rounded-lg bg-zinc-700 text-white"><LogOut size={14}/></button>
-                          <button onClick={async()=>{ if(confirm('Reset lock?')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="p-1.5 rounded-lg bg-sky-600 text-white"><RefreshCw size={14}/></button>
+                          <button onClick={()=>act('kick',u.id)} className="p-1.5 rounded-lg bg-zinc-700 text-white" title="Kick session"><LogOut size={14}/></button>
+                          <button onClick={async()=>{ if(confirm('Revoke IP/Device lock? Next login pe naya IP auto set hoga')){ await api.post(`/api/admin/users/${u.id}/reset-lock`); load()}}} className="p-1.5 rounded-lg bg-sky-600 text-white font-bold text-xs px-2" title="Revoke — clear IP/device, next login new lock">Revoke</button>
                           <button onClick={()=>del(u.id)} className="p-1.5 rounded-lg bg-red-600 text-white"><Trash2 size={14}/></button>
                         </div>
                       </td>
