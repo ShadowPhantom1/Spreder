@@ -18,11 +18,16 @@ function normalizeUrl(u: string): string {
   } catch { return u.trim().toLowerCase().replace(/\/+$/,'').replace(/\.json$/i,'') }
 }
 
+let _cache:any=null
+let _cacheTs=0
+function _invalidateCache(){ _cache=null; _cacheTs=0 }
 router.get('/', async (_req, res) => {
+  if(_cache && Date.now()-_cacheTs < 3000) return res.json(_cache)
   const rows = await Firebase.find().sort({created_at:-1}).lean() as any[]
   const counts = await Device.aggregate([{$match:{status:'online'}}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[]
   const onlineMap = new Map<string, number>(counts.map((r:any)=>[r._id, r.c]))
   const enriched = rows.map((r:any)=> ({...r, id:r._id, online_count: onlineMap.get(r._id) ?? 0 }))
+  _cache=enriched; _cacheTs=Date.now()
   res.json(enriched)
 })
 
@@ -36,6 +41,7 @@ router.post('/', async (req, res) => {
   if(dup) return res.status(409).json({ error: `Duplicate hive — already exists as "${dup.name}"`, duplicateId: dup._id })
   const id = randomUUID()
   await Firebase.create({_id:id, id, name, database_url, service_account_json: service_account_json ? JSON.stringify(service_account_json) : null, status:'unknown', created_at:new Date().toISOString()})
+  _invalidateCache()
   const created = await Firebase.findOne({_id:id}).lean()
   res.status(201).json({...created, id})
 })
@@ -49,6 +55,7 @@ router.put('/:id', async (req, res) => {
     database_url: database_url || existing.database_url,
     service_account_json: service_account_json ? JSON.stringify(service_account_json) : existing.service_account_json
   }})
+  _invalidateCache()
   const updated = await Firebase.findOne({_id:req.params.id}).lean()
   res.json({...updated, id: (updated as any)._id})
 })
@@ -57,6 +64,7 @@ router.delete('/:id', async (req, res) => {
   const fid=req.params.id
   await Device.deleteMany({firebase_id:fid})
   await Firebase.deleteOne({_id:fid})
+  _invalidateCache()
   res.json({ ok: true })
 })
 
@@ -103,6 +111,7 @@ router.post('/bulk', async (req, res) => {
     const created=await Firebase.findOne({_id:id}).lean()
     out.push({...created, id})
   }
+  if(out.length) _invalidateCache()
   res.status(201).json({ imported: out.length, skippedDuplicates, autoNamed, firebases: out })
 })
 
@@ -130,6 +139,7 @@ router.post('/cleanup-low-online', async (req, res)=>{
     await Device.deleteMany({firebase_id:fb.id})
     await Firebase.deleteOne({_id:fb.id})
   }
+  if(toDelete.length) _invalidateCache()
   res.json({ deleted: toDelete.length, threshold, deletedHives: toDelete, message: `Deleted ${toDelete.length} hive(s) with online < ${threshold}` })
 })
 
@@ -145,6 +155,7 @@ router.post('/:id/cleanup', async (req, res)=>{
   if(threshold!==null && online < threshold){
     await Device.deleteMany({firebase_id:fb._id})
     await Firebase.deleteOne({_id:fb._id})
+    _invalidateCache()
     return res.json({ ok:true, deletedHive:true, online, total, threshold, message: `Hive deleted — had ${online} online < ${threshold}` })
   }
   const del = await Device.deleteMany({firebase_id:fb._id, status:{$ne:'online'}})
