@@ -14,6 +14,8 @@ export default function Admin(){
   const [filter,setFilter]=useState<'all'|'active'|'disabled'|'super'>('all')
   const [showAdd,setShowAdd]=useState(false)
   const [editing,setEditing]=useState<string|null>(null)
+  const [formError,setFormError]=useState('')
+  const [creating,setCreating]=useState(false)
   const nav=useNavigate()
 
   const load=async()=>{
@@ -30,10 +32,25 @@ export default function Admin(){
   },[])
 
   const create=async()=>{
-    if(!form.username || !form.password) return setMsg('Username & password required')
+    setFormError('')
+    if(!form.username.trim() || !form.password.trim()){ setFormError('Username & password required'); setMsg('Username & password required'); return}
+    if(form.password.trim().length < 6){ setFormError('Password min 6 chars'); return}
     const days=parseInt(form.sub_days||'0',10)
+    if(isNaN(days) || days < 0){ setFormError('Days must be 0 or more'); return}
     const expires_at = days>0 ? new Date(Date.now()+days*24*60*60*1000).toISOString() : null
-    try{ await api.post('/api/admin/users', { username: form.username, password: form.password, per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at }); setMsg('✓ '+form.username+' created • '+ (days?days+' days':'lifetime')+' • IP auto on first login'); setForm({username:'', password:'', sub_days:'30'}); setShowAdd(false); load()}catch(e:any){ setMsg(e.message)}
+    setCreating(true)
+    try{
+      await api.post('/api/admin/users', { username: form.username.trim(), password: form.password, per_sim_limit:100, max_devices:100, allowed_ip:'', expires_at });
+      setMsg('✓ '+form.username+' created • '+ (days?days+' days':'lifetime')+' • IP auto on first login');
+      setForm({username:'', password:'', sub_days:'30'});
+      setFormError('');
+      setShowAdd(false);
+      load()
+    }catch(e:any){
+      const m=e.message||'Create failed'
+      setFormError(m)
+      setMsg(m)
+    }finally{ setCreating(false)}
   }
   const act=async(p:string,id:string)=>{ try{ await api.post(`/api/admin/users/${id}/${p}`); load()}catch(e:any){ setMsg(e.message)} }
   const del=async(id:string)=>{ if(!confirm('Delete user + data?')) return; try{ await api.del(`/api/admin/users/${id}`); load()}catch(e:any){ setMsg(e.message)} }
@@ -363,6 +380,8 @@ export default function Admin(){
                   </label>
                 </div>
 
+                {formError && <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 font-bold">⚠️ {formError}</div>}
+
                 <div className="mt-4 p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 flex gap-3">
                   <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white grid place-items-center shrink-0"><Lock size={14}/></div>
                   <div className="text-xs leading-relaxed"><b>Auto IP lock:</b> User pehli baar login karega → IP + Device auto save → 1 ID 2 device block. <b>Revoke</b> se naya lock.</div>
@@ -370,7 +389,7 @@ export default function Admin(){
 
                 <div className="flex gap-3 mt-6">
                   <button onClick={()=>setShowAdd(false)} className="flex-1 py-3 rounded-2xl bg-[#F0F7FF] border border-[#EAF4FF] font-black">Cancel</button>
-                  <button onClick={create} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#0066CC] to-[#1E40AF] text-white font-black shadow-lg">Create User</button>
+                  <button onClick={create} disabled={creating} className={`flex-1 py-3 rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 ${creating?'bg-zinc-300 text-zinc-600':'bg-gradient-to-r from-[#0066CC] to-[#1E40AF] text-white'}`}>{creating?'Creating…':'Create User'}</button>
                 </div>
                 <div className="text-center text-[11px] text-zinc-400 mt-3">Stored in <b>MongoDB Cluster0</b> • persists after Render restart</div>
               </div>
