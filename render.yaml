@@ -3,11 +3,13 @@ services:
     name: bhnstock-sms-spreader
     env: node
     plan: free
-    buildCommand: npm install && npm run build:render
+    buildCommand: npm install && VITE_OPEN_MODE=false npm run build:render
     startCommand: npm run start:render
     envVars:
       - key: NODE_VERSION
         value: 20.18.0
+      - key: VITE_OPEN_MODE
+        value: false
       - key: NODE_ENV
         value: production
       - key: PORT
