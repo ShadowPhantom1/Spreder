@@ -19,7 +19,7 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: MONGODB_URI
-        sync: false
+        value: mongodb+srv://z4x7272_db_user:eKbrq6FKAqBzqrLG@cluster0.sztzbyx.mongodb.net/?appName=Cluster0
       - key: ADMIN_USER
         value: admin
       - key: ADMIN_PASS

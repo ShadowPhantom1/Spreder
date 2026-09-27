@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "BHNSTOCK SMS SPREADER 3D WEB — Spider-Man Brand New Day Edition",
   "type": "module",
-  "engines": { "node": "20.x" },
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch src/server/index.ts",
@@ -21,6 +23,7 @@
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "dotenv": "^18.0.4",
     "express": "^4.21.2",
     "framer-motion": "^11.11.11",
     "jsonwebtoken": "^9.0.2",
