@@ -9,7 +9,6 @@ import Admin from './pages/Admin'
 import Docs from './pages/Docs'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
-import SuperLogin from './pages/SuperLogin'
 
 // OPEN_MODE syncs with server DISABLE_AUTH — true for preview, false for prod (secure by default)
 const OPEN_MODE = (import.meta as any).env?.VITE_OPEN_MODE === 'true'
@@ -23,7 +22,7 @@ function Guard({ children }: { children: React.ReactNode }){
 function SuperGuard({ children }: { children: React.ReactNode }){
   if (OPEN_MODE) return <>{children}</>
   const t = (()=>{ try{ return localStorage.getItem('token') }catch{ return null } })()
-  if(!t) return <Navigate to="/super" replace />
+  if(!t) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -33,7 +32,6 @@ export default function App(){
       <Routes>
         <Route path="/" element={<Landing/>} />
         <Route path="/login" element={<Login/>} />
-        <Route path="/super" element={<SuperLogin/>} />
         <Route path="/dashboard" element={<Guard><Layout><Dashboard/></Layout></Guard>} />
         <Route path="/campaigns" element={<Guard><Layout><Campaigns/></Layout></Guard>} />
         <Route path="/devices" element={<Guard><Layout><Devices/></Layout></Guard>} />

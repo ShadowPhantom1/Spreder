@@ -20,9 +20,9 @@ export default function Admin(){
     }catch(e:any){ setMsg(e.message)}
   }
   useEffect(()=>{
-    // security: if not super, kick to /super
+    // security: if not super, kick to /login (single login toggle)
     api.get('/api/auth/me').then((r:any)=>{
-      if(!r?.user?.is_super) window.location.href='/super'
+      if(!r?.user?.is_super) window.location.href='/login'
     }).catch(()=>{})
     load()
   },[])
@@ -269,7 +269,7 @@ export default function Admin(){
             <div className="mt-3 text-sm space-y-2">
               <div className="flex justify-between p-2 rounded-lg bg-white border"><span>JWT</span><b>Bearer + HttpOnly</b></div>
               <div className="flex justify-between p-2 rounded-lg bg-white border"><span>Expiry</span><b>7 days</b></div>
-              <div className="flex justify-between p-2 rounded-lg bg-white border"><span>Admin route</span><b>/super → /admin (super only)</b></div>
+              <div className="flex justify-between p-2 rounded-lg bg-white border"><span>Admin route</span><b>/login (toggle) → /admin (super only)</b></div>
             </div>
           </div>
         </div>

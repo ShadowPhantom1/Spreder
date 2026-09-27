@@ -24,7 +24,14 @@ export default function Login(){
       const data = await res.json().catch(()=>({}))
       if(!res.ok) throw new Error(data?.error || `Login failed (${res.status})`)
       if(data.token) localStorage.setItem('token', data.token)
-      nav('/dashboard')
+      // if super toggle → verify is_super, else kick
+      if(mode==='super'){
+        const me=await fetch('/api/auth/me',{headers:{'Authorization':`Bearer ${data.token}`},credentials:'include'}).then(r=>r.json()).catch(()=>null)
+        if(!me?.user?.is_super){ localStorage.removeItem('token'); throw new Error('Not a Super Admin — access denied') }
+        nav('/admin')
+      } else {
+        nav('/dashboard')
+      }
     }catch(err:any){ setErr(err.message || 'Unknown error'); } finally{ setLoading(false)}
   }
   return (
