@@ -1,4 +1,5 @@
-import { db, getSetting } from '../db/index.js'
+import { getSetting } from '../db/index.js'
+import { Firebase, Device } from '../db/index.js'
 import * as firebaseService from './firebaseService.js'
 import type { Server as IOServer } from 'socket.io'
 
@@ -34,55 +35,43 @@ export function stop() {
 }
 
 async function pollAll() {
-  const firebases = db.prepare("SELECT * FROM firebases").all() as any[]
+  const firebases = await Firebase.find().lean() as any[]
   if (firebases.length === 0) return
   const concurrency = Math.max(1, parseInt(getSetting('hive_concurrency')||'3',10))
-  // chunk poll for 5-6 hives without overloading
   for(let i=0;i<firebases.length;i+=concurrency){
     const chunk = firebases.slice(i,i+concurrency)
     await Promise.all(chunk.map(async (fb:any)=>{
+      const fbId=fb._id || fb.id
       try {
-        const devices = await firebaseService.pollDevices(fb)
+        const devices = await firebaseService.pollDevices({...fb, id:fbId})
         const now = new Date().toISOString()
         const defaultSim = parseInt(getSetting('default_sim_count')||'1',10) || 1
-        const upsert = db.prepare(`
-          INSERT INTO devices (id, firebase_id, name, model, status, battery, signal, last_seen, created_at, sim_count, has_recharge, sim1_recharge, sim2_recharge)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET name=excluded.name, model=excluded.model, status=excluded.status, battery=excluded.battery, signal=excluded.signal, last_seen=excluded.last_seen
-        `)
-        const txn = db.transaction(() => {
-          for (const d of devices) {
-            // normalize busy: if Firebase status is true but webhook pending, mark busy, else online
-            if(d.status==='busy' && !d.name.includes('pending')) d.status='online'
-            // preserve existing sim_count/has_recharge if already set
-            const existing = db.prepare('SELECT sim_count, has_recharge, sim1_recharge, sim2_recharge FROM devices WHERE id=?').get(d.id) as any
-            const simCount = existing?.sim_count ?? defaultSim
-            const hasRec = existing?.has_recharge ?? 1
-            const s1 = existing?.sim1_recharge ?? 1
-            const s2 = existing?.sim2_recharge ?? 1
-            upsert.run(d.id, fb.id, d.name, d.model || null, d.status, d.battery ?? null, d.signal ?? null, d.last_seen || now, now, simCount, hasRec, s1, s2)
-          }
-        })
-        txn()
+        for (const d of devices) {
+          if(d.status==='busy' && !d.name.includes('pending')) d.status='online'
+          const existing = await Device.findOne({_id:d.id}).lean() as any
+          const simCount = existing?.sim_count ?? defaultSim
+          const hasRec = existing?.has_recharge ?? 1
+          const s1 = existing?.sim1_recharge ?? 1
+          const s2 = existing?.sim2_recharge ?? 1
+          await Device.updateOne({_id:d.id}, {$set:{ _id:d.id, id:d.id, firebase_id:fbId, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, created_at: existing?.created_at || now, sim_count:simCount, has_recharge:hasRec, sim1_recharge:s1, sim2_recharge:s2}}, {upsert:true})
+        }
         const fbStatus = devices.length===0 ? 'offline' : 'online'
-        db.prepare('UPDATE firebases SET device_count=?, status=? WHERE id=?').run(devices.length, fbStatus, fb.id)
+        await Firebase.updateOne({_id:fbId}, {$set:{device_count:devices.length, status:fbStatus}})
         if (io) {
-          io.emit('devices:update', { firebaseId: fb.id, count: devices.length, devices: devices.slice(0, 8) })
-          io.emit('firebases:update', { id: fb.id, device_count: devices.length, status: 'online' })
+          io.emit('devices:update', { firebaseId: fbId, count: devices.length, devices: devices.slice(0, 8) })
+          io.emit('firebases:update', { id: fbId, device_count: devices.length, status: 'online' })
         }
       } catch (e: any) {
-        db.prepare('UPDATE firebases SET status=? WHERE id=?').run('offline', fb.id)
-        if (io) io.emit('firebases:update', { id: fb.id, status: 'offline', error: e.message })
+        await Firebase.updateOne({_id:fbId}, {$set:{status:'offline'}})
+        if (io) io.emit('firebases:update', { id: fbId, status: 'offline', error: e.message })
       }
     }))
   }
   if (io) {
-    const stats = db.prepare(`SELECT 
-      (SELECT COUNT(*) FROM devices WHERE status='online') as online,
-      (SELECT COUNT(*) FROM devices WHERE status='offline') as offline,
-      (SELECT COUNT(*) FROM devices WHERE status='busy') as busy,
-      (SELECT COUNT(*) FROM devices) as total
-    `).get() as any
-    io.emit('stats:devices', stats)
+    const online=await Device.countDocuments({status:'online'})
+    const offline=await Device.countDocuments({status:'offline'})
+    const busy=await Device.countDocuments({status:'busy'})
+    const total=await Device.countDocuments()
+    io.emit('stats:devices', {online, offline, busy, total})
   }
 }

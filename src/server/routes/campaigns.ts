@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { db } from '../db/index.js'
+import { Campaign, CampaignMessage, Setting } from '../db/index.js'
 import { authRequired } from '../middleware/auth.js'
 import * as queueService from '../services/queueService.js'
 
@@ -8,7 +8,7 @@ router.use(authRequired as any)
 
 function generateSimplePdf(campaign:any, messages:any[]): Buffer {
   const lines: string[] = []
-  lines.push(`Campaign: ${campaign.name} (${campaign.id})`)
+  lines.push(`Campaign: ${campaign.name} (${campaign.id || campaign._id})`)
   lines.push(`Status: ${campaign.status} | Total: ${campaign.total} | Sent: ${campaign.sent} | Failed: ${campaign.failed} | Pending: ${campaign.pending}`)
   lines.push(`Template: ${campaign.template.slice(0,120)}`)
   lines.push(`Created: ${campaign.created_at} | Finished: ${campaign.finished_at||'-'}`)
@@ -37,9 +37,9 @@ function generateSimplePdf(campaign:any, messages:any[]): Buffer {
   return Buffer.from(pdf)
 }
 
-router.get('/', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM campaigns ORDER BY created_at DESC').all()
-  res.json(rows)
+router.get('/', async (_req, res) => {
+  const rows = await Campaign.find().sort({created_at:-1}).lean() as any[]
+  res.json(rows.map((r:any)=> ({...r, id:r._id})))
 })
 
 router.post('/', async (req, res) => {
@@ -49,7 +49,6 @@ router.post('/', async (req, res) => {
   let contactList: Array<{ phone: string; vars?: Record<string,string> }> = contacts || []
   if (contactsText && typeof contactsText === 'string') {
     let lines = contactsText.split(/[\r\n;]+/).map((l:string)=>l.trim()).filter(Boolean)
-    // header detection: if first line looks like header (contains phone/vehicle/name without digits)
     let headers: string[] | null = null
     if(lines.length>0){
       const first = lines[0].toLowerCase()
@@ -62,20 +61,15 @@ router.post('/', async (req, res) => {
     for (const line of lines) {
       const parts = line.split(',').map((s:string)=>s.trim())
       if (!parts[0]) continue
-      // auto-detect phone column: find part matching phone regex
       let phoneIdx = 0
       let phone = parts[0]
       if(headers){
         const pIdx = headers.findIndex(h=> h.includes('phone'))
         if(pIdx>=0) { phoneIdx = pIdx; phone = parts[pIdx] }
-        // fallback auto-detect
         if(!/^\+?[0-9]{7,15}$/.test(phone.replace(/\s/g,''))){
           for(let i=0;i<parts.length;i++) if(/^\+?[0-9]{7,15}$/.test(parts[i].replace(/\s/g,''))){ phoneIdx=i; phone=parts[i]; break }
         }
-      } else {
-        // without header, first col is phone
-        phone = parts[0]
-      }
+      } else { phone = parts[0] }
       const vars: Record<string,string> = {}
       if(headers){
         headers.forEach((h, idx)=>{
@@ -83,21 +77,14 @@ router.post('/', async (req, res) => {
           const val = parts[idx] || ''
           if(!val) return
           vars[h] = val
-          // alias
           if(h==='vehicle') { vars.vehical = val; vars.vehicle = val }
           if(h==='vehical') { vars.vehicle = val; vars.vehical = val }
         })
-        // ensure name fallback
         if(!vars.name && (vars.vehicle || vars.vehical)) vars.name = vars.vehicle || vars.vehical
         if(!vars.vehicle && vars.name) { vars.vehicle = vars.name; vars.vehical = vars.name }
       } else {
         const second = parts[1] || ''
-        if(second){
-          vars.name = second
-          vars.vehicle = second
-          vars.vehical = second
-          if(parts[2]) { vars.vehicle = parts[2]; vars.vehical = parts[2] }
-        }
+        if(second){ vars.name = second; vars.vehicle = second; vars.vehical = second; if(parts[2]) { vars.vehicle = parts[2]; vars.vehical = parts[2] } }
       }
       contactList.push({ phone, vars })
     }
@@ -106,36 +93,33 @@ router.post('/', async (req, res) => {
 
   try {
     const result = await queueService.createCampaign({ name, template, contacts: contactList, batch_size, delay_ms })
-    const campaign = db.prepare('SELECT * FROM campaigns WHERE id=?').get(result.id)
-    res.status(201).json({ campaign, ...result })
+    const campaign = await Campaign.findOne({_id:result.id}).lean() as any
+    res.status(201).json({ campaign: {...campaign, id:campaign._id}, ...result })
   } catch (e: any) {
     res.status(500).json({ error: e.message })
   }
 })
 
-router.get('/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM campaigns WHERE id=?').get(req.params.id) as any
+router.get('/:id', async (req, res) => {
+  const row = await Campaign.findOne({_id:req.params.id}).lean() as any
   if (!row) return res.status(404).json({ error: 'Not found' })
-  res.json(row)
+  res.json({...row, id:row._id})
 })
 
-router.get('/:id/messages', (req, res) => {
+router.get('/:id/messages', async (req, res) => {
   const { status, limit = 100, offset = 0 } = req.query as any
-  let sql = 'SELECT * FROM campaign_messages WHERE campaign_id = ?'
-  const params: any[] = [req.params.id]
-  if (status) { sql += ' AND status = ?'; params.push(status) }
-  sql += ' ORDER BY sent_at DESC, created_at DESC LIMIT ? OFFSET ?'
-  params.push(Number(limit), Number(offset))
-  const rows = db.prepare(sql).all(...params)
-  const total = (db.prepare('SELECT COUNT(*) as c FROM campaign_messages WHERE campaign_id=?').get(req.params.id) as any).c
-  res.json({ messages: rows, total })
+  const filter:any={campaign_id:req.params.id}
+  if (status) filter.status=status
+  const rows = await CampaignMessage.find(filter).sort({sent_at:-1, created_at:-1}).limit(Number(limit)).skip(Number(offset)).lean() as any[]
+  const total = await CampaignMessage.countDocuments({campaign_id:req.params.id})
+  res.json({ messages: rows.map((r:any)=> ({...r, id:r._id})), total })
 })
 
-router.get('/:id/export', (req, res)=>{
-  const campaign = db.prepare('SELECT * FROM campaigns WHERE id=?').get(req.params.id) as any
+router.get('/:id/export', async (req, res)=>{
+  const campaign = await Campaign.findOne({_id:req.params.id}).lean() as any
   if(!campaign) return res.status(404).json({ error:'Not found' })
   const format = ((req.query.format as string)||'csv').toLowerCase()
-  const messages = db.prepare('SELECT phone, status, device_id, firebase_id, attempts, last_error, sent_at, rendered, variables FROM campaign_messages WHERE campaign_id=? ORDER BY sent_at, created_at').all(req.params.id) as any[]
+  const messages = await CampaignMessage.find({campaign_id:req.params.id}).sort({sent_at:1, created_at:1}).lean() as any[]
   if(format==='csv'){
     const header=['phone','status','device_id','firebase_id','attempts','last_error','sent_at','rendered']
     const rows=messages.map((m:any)=> header.map(h=>{
@@ -146,44 +130,39 @@ router.get('/:id/export', (req, res)=>{
     }).join(','))
     const csv=[header.join(','), ...rows].join('\n')
     res.setHeader('Content-Type','text/csv; charset=utf-8')
-    res.setHeader('Content-Disposition',`attachment; filename="campaign-${campaign.id}.csv"`)
+    res.setHeader('Content-Disposition',`attachment; filename="campaign-${campaign._id}.csv"`)
     return res.send(csv)
   } else if(format==='pdf'){
-    const pdf=generateSimplePdf(campaign, messages)
+    const pdf=generateSimplePdf({...campaign, id:campaign._id}, messages)
     res.setHeader('Content-Type','application/pdf')
-    res.setHeader('Content-Disposition',`attachment; filename="campaign-${campaign.id}.pdf"`)
+    res.setHeader('Content-Disposition',`attachment; filename="campaign-${campaign._id}.pdf"`)
     return res.send(pdf)
   } else return res.status(400).json({ error:'format must be csv or pdf' })
 })
 
 router.post('/:id/notify-webhook', async (req,res)=>{
-  const campaign = db.prepare('SELECT * FROM campaigns WHERE id=?').get(req.params.id) as any
+  const campaign = await Campaign.findOne({_id:req.params.id}).lean() as any
   if(!campaign) return res.status(404).json({ error:'Not found' })
-  const url = (db.prepare("SELECT value FROM settings WHERE key='webhook_url'").get() as any)?.value
-  const enabled = (db.prepare("SELECT value FROM settings WHERE key='webhook_enabled'").get() as any)?.value === 'true'
+  const webhookUrlDoc = await Setting.findOne({_id:'webhook_url'}).lean() as any
+  const enabledDoc = await Setting.findOne({_id:'webhook_enabled'}).lean() as any
+  const url = webhookUrlDoc?.value
+  const enabled = enabledDoc?.value === 'true'
   if(!enabled || !url) return res.status(400).json({ error:'Webhook not enabled/configured in Settings' })
-  const secret = (db.prepare("SELECT value FROM settings WHERE key='webhook_secret'").get() as any)?.value || ''
+  const secretDoc = await Setting.findOne({_id:'webhook_secret'}).lean() as any
+  const secret = secretDoc?.value || ''
   try{
-    const payload={ event:'campaign.manual_notify', campaign, sent: campaign.sent, failed: campaign.failed, total: campaign.total }
-    // @ts-ignore
+    const payload={ event:'campaign.manual_notify', campaign:{...campaign, id:campaign._id}, sent: campaign.sent, failed: campaign.failed, total: campaign.total }
     const r=await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', ...(secret?{'X-Webhook-Secret':secret}:{}) }, body: JSON.stringify(payload) })
     const text=await r.text().catch(()=>'')
     res.json({ ok:true, status: r.status, response: text.slice(0,500), url })
   }catch(e:any){ res.status(500).json({ error: e.message })}
 })
 
-router.post('/bulk-delete', (req, res)=>{
+router.post('/bulk-delete', async (req, res)=>{
   const { ids } = req.body || {}
   if(!Array.isArray(ids)) return res.status(400).json({ error:'ids array required' })
-  let deleted=0
-  const txn=db.transaction(()=>{
-    for(const id of ids){
-      const r=db.prepare('DELETE FROM campaigns WHERE id=?').run(id)
-      deleted+= r.changes
-    }
-  })
-  txn()
-  res.json({ deleted })
+  const r=await Campaign.deleteMany({_id:{$in:ids}})
+  res.json({ deleted: r.deletedCount })
 })
 
 router.post('/:id/start', async (req, res) => {
@@ -204,8 +183,8 @@ router.post('/:id/cancel', async (req, res) => {
   const c = await queueService.cancelCampaign(req.params.id)
   res.json(c)
 })
-router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM campaigns WHERE id=?').run(req.params.id)
+router.delete('/:id', async (req, res) => {
+  await Campaign.deleteOne({_id:req.params.id})
   res.json({ ok: true })
 })
 
