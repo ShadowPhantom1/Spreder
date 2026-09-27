@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 
 const nav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, sub: 'Command Center', img: '/icons/icon-dashboard.png' },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, sub: 'Command Center', img: '/icons/icon-dashboard.png' },
   { to: '/campaigns', label: 'Campaigns', icon: Megaphone, sub: 'Web Spread', img: '/icons/icon-campaigns.png' },
   { to: '/devices', label: 'Devices', icon: Smartphone, sub: 'Spider-Bots', img: '/icons/icon-devices.png' },
   { to: '/firebases', label: 'Firebase Hives', icon: Database, sub: 'RTDB Hives', img: '/icons/icon-hives.png' },

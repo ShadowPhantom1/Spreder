@@ -8,15 +8,15 @@ import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Docs from './pages/Docs'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 
 // OPEN_MODE syncs with server DISABLE_AUTH — true for preview, false for prod
 const OPEN_MODE = (import.meta as any).env?.VITE_OPEN_MODE !== 'false'
 
 function Guard({ children }: { children: React.ReactNode }){
   if (OPEN_MODE) return <>{children}</>
-  // when OPEN_MODE false, verify session — if no token, redirect
   const t = (()=>{ try{ return localStorage.getItem('token') }catch{ return null } })()
-  if(!t) return <>{children}</> // will be caught by api 401 and redirect in Layout
+  if(!t) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -24,8 +24,9 @@ export default function App(){
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Landing/>} />
         <Route path="/login" element={<Login/>} />
-        <Route path="/" element={<Guard><Layout><Dashboard/></Layout></Guard>} />
+        <Route path="/dashboard" element={<Guard><Layout><Dashboard/></Layout></Guard>} />
         <Route path="/campaigns" element={<Guard><Layout><Campaigns/></Layout></Guard>} />
         <Route path="/devices" element={<Guard><Layout><Devices/></Layout></Guard>} />
         <Route path="/firebases" element={<Guard><Layout><Firebases/></Layout></Guard>} />
