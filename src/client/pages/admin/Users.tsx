@@ -31,14 +31,20 @@ export default function UsersPage(){
       setShowAdd(false);
       load()
     }catch(e:any){
-      const m=e.message||'Create failed'
+      let m=e.message||'Create failed'
+      if(m.includes('Invalid token')||m.includes('Unauthorized')||m.includes('thwip')){
+        m='Session expired — please login again at /super as admin'
+        // auto redirect after 1.5s
+        setTimeout(()=> window.location.href='/super', 1500)
+      }
+      if(m.includes('Super admin only')) m='Super admin only — login at /super with admin credentials'
       setFormError(m)
       setMsg(m)
     }finally{ setCreating(false)}
   }
-  const act=async(p:string,id:string)=>{ try{ await api.post(`/api/admin/users/${id}/${p}`); setMsg('✓ '+p); load()}catch(e:any){ setMsg(e.message)} }
-  const del=async(id:string)=>{ if(!confirm('Delete user + data?')) return; try{ await api.del(`/api/admin/users/${id}`); setMsg('✓ Deleted'); load()}catch(e:any){ setMsg(e.message)} }
-  const save=async(id:string, per:number, ip:string)=>{ try{ await api.put(`/api/admin/users/${id}`, {per_sim_limit:per, allowed_ip:ip}); setMsg('✓ Saved'); setEditing(null); load()}catch(e:any){ setMsg(e.message)} }
+  const act=async(p:string,id:string)=>{ try{ await api.post(`/api/admin/users/${id}/${p}`); setMsg('✓ '+p); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')){ m='Session expired — re-login at /super'; setTimeout(()=> window.location.href='/super',1200)}; setMsg(m)} }
+  const del=async(id:string)=>{ if(!confirm('Delete user + data?')) return; try{ await api.del(`/api/admin/users/${id}`); setMsg('✓ Deleted'); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')) m='Session expired — re-login at /super'; setMsg(m)} }
+  const save=async(id:string, per:number, ip:string)=>{ try{ await api.put(`/api/admin/users/${id}`, {per_sim_limit:per, allowed_ip:ip}); setMsg('✓ Saved'); setEditing(null); load()}catch(e:any){ let m=e.message||'failed'; if(m.includes('Invalid token')) m='Session expired — re-login at /super'; setMsg(m)} }
 
   const filtered = users.filter((u:any)=>{
     if(q && !u.username.toLowerCase().includes(q.toLowerCase()) && !(u.allowed_ip||'').includes(q)) return false
@@ -56,14 +62,14 @@ export default function UsersPage(){
           <h2 className="font-black text-lg flex items-center gap-2"><Users size={18} className="text-[#0066CC]"/> User Management <span className="px-2.5 py-1 rounded-full bg-[#0066CC] text-white text-xs font-black">{filtered.length}</span></h2>
           <p className="text-xs text-zinc-500">Add via popup • First login IP auto-lock • 1 ID 1 device • Super only • /adminbhnstock</p>
         </div>
-        <button onClick={()=>setShowAdd(true)} className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#0066CC] to-[#1E40AF] text-white font-black flex items-center gap-2 shadow-lg hover:shadow-xl"><UserPlus size={18}/> Add User</button>
+        <button onClick={()=>setShowAdd(true)} className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#E30613] to-[#9A0007] text-white font-black flex items-center gap-2 shadow-[0_8px_22px_rgba(227,6,19,0.35)] hover:shadow-xl"><UserPlus size={18}/> Add User</button>
       </div>
 
       <div className="rounded-[20px] bg-white border border-[#EAF4FF] shadow-sm p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
           <div className="flex gap-1 p-1 rounded-full bg-[#F0F7FF] border border-[#EAF4FF]">
             {['all','active','disabled','super'].map(f=>(
-              <button key={f} onClick={()=>setFilter(f as any)} className={`px-4 py-1.5 rounded-full text-xs font-black capitalize ${filter===f?'bg-[#0066CC] text-white shadow':'text-zinc-600 hover:bg-white'}`}>{f}</button>
+              <button key={f} onClick={()=>setFilter(f as any)} className={`px-4 py-1.5 rounded-full text-xs font-black capitalize ${filter===f?'bg-[#E30613] text-white shadow':'text-zinc-600 hover:bg-white'}`}>{f}</button>
             ))}
           </div>
           <div className="flex items-center gap-2">
@@ -140,11 +146,11 @@ export default function UsersPage(){
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div onClick={()=>setShowAdd(false)} className="absolute inset-0 bg-[#0A1628]/60 backdrop-blur-md"/>
             <motion.div initial={{scale:0.92, y:20, opacity:0}} animate={{scale:1, y:0, opacity:1}} exit={{scale:0.92, opacity:0}} className="relative w-full max-w-[480px] rounded-[24px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/50 overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-[#0066CC] via-[#00BFFF] to-[#0066CC]"/>
+              <div className="h-1 bg-gradient-to-r from-[#E30613] via-[#FFD23F] to-[#0066CC]"/>
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0066CC] to-[#1E40AF] grid place-items-center text-white"><UserPlus size={18}/></div>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#E30613] to-[#9A0007] grid place-items-center text-white"><UserPlus size={18}/></div>
                     <div><h2 className="font-black text-lg leading-none">New User</h2><p className="text-xs text-zinc-500">Add to MongoDB • auto IP on first login</p></div>
                   </div>
                   <button onClick={()=>setShowAdd(false)} className="w-9 h-9 rounded-full bg-[#F0F7FF] grid place-items-center hover:bg-zinc-100">✕</button>
@@ -171,7 +177,7 @@ export default function UsersPage(){
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={()=>setShowAdd(false)} className="flex-1 py-3 rounded-2xl bg-[#F0F7FF] border border-[#EAF4FF] font-black">Cancel</button>
-                  <button onClick={create} disabled={creating} className={`flex-1 py-3 rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 ${creating?'bg-zinc-300 text-zinc-600':'bg-gradient-to-r from-[#0066CC] to-[#1E40AF] text-white'}`}>{creating?'Creating…':'Create User'}</button>
+                  <button onClick={create} disabled={creating} className={`flex-1 py-3 rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 ${creating?'bg-zinc-300 text-zinc-600':'bg-gradient-to-r from-[#E30613] to-[#9A0007] text-white shadow-[0_8px_20px_rgba(227,6,19,0.35)]'}`}>{creating?'Creating…':'Create User'}</button>
                 </div>
                 <div className="text-center text-[11px] text-zinc-400 mt-3">Stored in <b>MongoDB Cluster0</b> • persists after Render restart</div>
               </div>

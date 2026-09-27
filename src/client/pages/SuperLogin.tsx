@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, Crown, Shield, Lock } from 'lucide-react'
+import { Eye, EyeOff, Shield, Crown, Zap } from 'lucide-react'
 
 export default function SuperLogin(){
   const [u,setU]=useState('')
@@ -13,49 +13,79 @@ export default function SuperLogin(){
     e.preventDefault()
     setErr(null); setLoading(true)
     try{
-      const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({username:u,password:p})})
-      const data=await res.json().catch(()=>({}))
-      if(!res.ok) throw new Error(data?.error||'Login failed')
-      if(data.token) localStorage.setItem('token',data.token)
+      const res = await fetch('/api/auth/login', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify({username:u, password:p})
+      })
+      const data = await res.json().catch(()=>({}))
+      if(!res.ok) throw new Error(data?.error || `Login failed (${res.status})`)
+      if(data.token) localStorage.setItem('token', data.token)
       // verify super
       const me=await fetch('/api/auth/me',{headers:{'Authorization':`Bearer ${data.token}`},credentials:'include'}).then(r=>r.json()).catch(()=>null)
-      if(!me?.user?.is_super) { localStorage.removeItem('token'); throw new Error('Not a Super Admin — access denied') }
-      nav('/admin')
-    }catch(e:any){ setErr(e.message)} finally{ setLoading(false)}
+      if(!me?.user?.is_super){ localStorage.removeItem('token'); throw new Error('Not a Super Admin — access denied') }
+      nav('/adminbhnstock')
+    }catch(e:any){ setErr(e.message) } finally{ setLoading(false)}
   }
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#EAF4FF] relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0066CC]/10 via-transparent to-[#00BFFF]/10" />
-      <div className="absolute top-20 right-20 w-72 h-72 bg-[#0066CC]/5 rounded-full blur-3xl" />
-      <div className="relative w-full max-w-[440px]">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0A1628] relative overflow-hidden">
+      {/* spidey webs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#E30613]/20 via-transparent to-[#0066CC]/15 pointer-events-none" />
+      <div className="absolute inset-0 opacity-[0.06]" style={{backgroundImage:`radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,backgroundSize:'22px 22px'}} />
+      <div className="absolute -top-24 -right-24 w-[520px] h-[520px] bg-[#E30613]/20 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute -bottom-32 -left-32 w-[640px] h-[640px] bg-[#0066CC]/15 rounded-full blur-[90px] pointer-events-none" />
+      {/* web lines svg */}
+      <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage:`repeating-linear-gradient(0deg, transparent 0 28px, rgba(255,255,255,0.5) 29px), repeating-linear-gradient(90deg, transparent 0 28px, rgba(255,255,255,0.5) 29px)`}} />
+
+      <div className="relative w-full max-w-[460px]">
         <div className="text-center mb-6">
-          <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0066CC] to-[#1E40AF] flex items-center justify-center shadow-xl border border-white/20"><Crown size={32} className="text-white"/></div>
-          <h1 className="font-black text-2xl mt-4 text-[#0A1628]">SUPER ADMIN <span className="text-[#0066CC]">LOGIN</span></h1>
-          <p className="text-xs tracking-widest text-[#0066CC]/60">NIVEA 3D • SECURE • ONE DEVICE</p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0066CC] text-white text-xs font-bold"><Shield size={12}/> EARTH-616 SECURE</div>
-        </div>
-        <form onSubmit={submit} className="rounded-3xl bg-white p-6 shadow-[0_20px_60px_rgba(0,102,204,0.15)] border border-[#BFD9FF]">
-          <div className="text-center mb-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EAF4FF] border border-[#BFD9FF] text-xs font-black text-[#0066CC]"><Lock size={12}/> SUPER ONLY</div>
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-white/60 hover:text-white">← Back to Home</Link>
+          <div className="mt-4 flex justify-center">
+            <div className="relative">
+              <div className="absolute -inset-3 bg-gradient-to-r from-[#E30613] to-[#0066CC] rounded-[22px] blur-xl opacity-40" />
+              <div className="relative w-[92px] h-[92px] rounded-2xl bg-white flex items-center justify-center shadow-xl p-1.5 border-2 border-[#E30613]">
+                <img src="/logo-bhnstock.png" alt="BHN" className="w-full h-full object-contain rounded-xl" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#E30613] border-2 border-white grid place-items-center shadow-lg"><Crown size={14} className="text-white"/></div>
+            </div>
           </div>
-          {err && <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{err}</div>}
+          <h1 className="font-black text-2xl mt-4 text-white tracking-tight">🕷️ SPIDER ADMIN <span className="text-[#FF3B30]">CONSOLE</span></h1>
+          <p className="text-xs tracking-widest text-white/50">BRAND NEW DAY • WEB-OS v3.0 • /adminbhnstock</p>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E30613] text-white text-[11px] font-black tracking-widest shadow-lg"><Shield size={12}/> SUPER ADMIN ONLY</div>
+        </div>
+
+        <form onSubmit={submit} className="rounded-[24px] p-6 shadow-2xl border-2 border-[#E30613]/30 bg-gradient-to-br from-white to-[#FFF5F5] text-[#0A1628] relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#E30613] via-[#FFD23F] to-[#0066CC]" />
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black tracking-widest bg-[#E30613] text-white"><Zap size={12}/> FRIENDLY NEIGHBORHOOD ACCESS</div>
+            <p className="text-xs text-black/60 mt-2">Users • Devices • Campaigns • Security • Full control</p>
+          </div>
+          {err && <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 font-bold">{err}</div>}
           <div className="space-y-4">
             <label className="block">
-              <span className="text-xs font-black tracking-widest text-black/60">SUPER USERNAME</span>
-              <input value={u} onChange={e=>setU(e.target.value)} required placeholder="admin" className="mt-1 w-full px-4 py-3 rounded-xl bg-[#EAF4FF] border border-[#BFD9FF] outline-none focus:border-[#0066CC] text-sm"/>
+              <span className="text-xs font-black tracking-widest text-[#E30613]">SUPER USERNAME</span>
+              <input value={u} onChange={e=>setU(e.target.value)} required className="mt-1 w-full px-4 py-3 rounded-xl bg-[#FFF0F0] border-2 border-[#E30613]/15 outline-none focus:border-[#E30613] focus:bg-white text-sm font-bold" placeholder="admin" />
             </label>
             <label className="block">
-              <span className="text-xs font-black tracking-widest text-black/60">PASSWORD</span>
+              <span className="text-xs font-black tracking-widest text-[#0A1628]">PASSWORD</span>
               <div className="mt-1 relative">
-                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required placeholder="••••••••" className="w-full px-4 py-3 pr-12 rounded-xl bg-[#EAF4FF] border border-[#BFD9FF] outline-none focus:border-[#0066CC] text-sm"/>
+                <input type={show?'text':'password'} value={p} onChange={e=>setP(e.target.value)} required className="w-full px-4 py-3 pr-12 rounded-xl bg-[#F0F7FF] border-2 border-[#0066CC]/15 outline-none focus:border-[#0066CC] focus:bg-white text-sm" placeholder="••••••••" />
                 <button type="button" onClick={()=>setShow(v=>!v)} className="absolute right-1 top-1 bottom-1 w-10 grid place-items-center rounded-xl hover:bg-black/5">{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>
               </div>
             </label>
-            <button disabled={loading} className="w-full py-3 rounded-full bg-gradient-to-r from-[#0066CC] to-[#1E40AF] text-white font-black flex items-center justify-center gap-2 shadow-lg">{loading?'VERIFYING…':'ENTER SUPER ADMIN'}</button>
-            <div className="text-center text-xs text-zinc-500">Normal users → <Link to="/login" className="text-[#0066CC] font-bold">User Login</Link></div>
+            <button disabled={loading} className="w-full py-3 rounded-full text-white text-sm font-black flex items-center justify-center gap-2 bg-gradient-to-r from-[#E30613] to-[#9A0007] hover:from-[#FF2D3B] hover:to-[#E30613] shadow-[0_8px_20px_rgba(227,6,19,0.35)] disabled:opacity-60">
+              <Crown size={16}/>{loading?'THWIPPING…':'ENTER SPIDER CONSOLE'}
+            </button>
+            <div className="text-center text-[11px] text-zinc-500">Default: <b>admin / admin123456</b> — change after first login</div>
           </div>
         </form>
-        <p className="text-center text-[10px] tracking-widest text-[#0066CC]/30 mt-4">© 2026 BHNSTOCK • SUPER ADMIN • NIVEA 3D</p>
+
+        <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center gap-3 backdrop-blur">
+          <div className="w-10 h-10 rounded-xl bg-[#FFD23F] grid place-items-center font-black text-[#0A1628]">!</div>
+          <div className="text-xs leading-relaxed text-white/70"><b className="text-white">One Device • One IP</b> — first login locks IP+Device. Revoke to allow new device. Super only via <b className="text-[#FFD23F]">/adminbhnstock</b> or <b className="text-[#FFD23F]">/super</b>.</div>
+        </div>
+        <p className="text-center text-[10px] tracking-widest text-white/30 mt-4">© 2026 BHNSTOCK • SPIDER ADMIN • WITH GREAT POWER</p>
       </div>
     </div>
   )
