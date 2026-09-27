@@ -26,7 +26,12 @@ const dir = path.dirname(config.DATABASE_PATH)
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 export const db = new Database(':memory:')
 db.pragma('foreign_keys = OFF')
-console.log('[DB] SQLite in-memory dummy (not used, all data Mongo)')
+db.exec(`
+CREATE TABLE IF NOT EXISTS sessions (user_id TEXT PRIMARY KEY, ip TEXT, device_id TEXT, token TEXT, last_active TEXT);
+CREATE TABLE IF NOT EXISTS devices (id TEXT PRIMARY KEY, firebase_id TEXT, name TEXT, status TEXT, last_seen TEXT);
+CREATE TABLE IF NOT EXISTS campaign_messages (id TEXT PRIMARY KEY, campaign_id TEXT, device_id TEXT, status TEXT, sent_at TEXT);
+`)
+console.log('[DB] SQLite in-memory dummy (sessions/devices only, main data Mongo)')
 
 // seed admin into Mongo
 import bcrypt from 'bcryptjs'
@@ -63,11 +68,13 @@ for(const [k,v] of Object.entries(defaults)){
 
 let settingsCache: Record<string,string> = {}
 async function loadCache(){
-  const all=await Setting.find().lean() as any[]
-  settingsCache={}
-  for(const s of all) settingsCache[s.key]=s.value
+  try{
+    const all=await Setting.find().lean() as any[]
+    settingsCache={}
+    for(const s of all) settingsCache[s.key]=s.value
+  }catch(e:any){ console.log('[DB] loadCache fail',e.message)}
 }
-await loadCache()
+loadCache().catch(()=>{})
 
 export function getSetting(key:string){
   return settingsCache[key] || ''

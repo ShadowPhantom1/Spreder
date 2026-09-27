@@ -10,21 +10,32 @@ r.use(authRequired, superRequired)
 
 // list all users + stats — fully Mongo
 r.get('/users', async (req,res)=>{
-  let users:any[]=[]
-  if(useMongo){
-    const User=mongoose.model('User')
-    const docs=await User.find().sort({created_at:-1}).lean() as any
-    users=docs.map((d:any)=>({ ...d, id:d._id, _id:d._id }))
-  } else {
-    users = db.prepare('SELECT id, username, role, is_super, is_active, allowed_ip, allowed_device, per_sim_limit, max_devices, expires_at, created_at FROM users ORDER BY created_at DESC').all() as any[]
-  }
-  const enriched = users.map((u:any)=>{
-    const dev = db.prepare("SELECT COUNT(*) as c FROM devices WHERE status='online'").get() as any
-    const camps = db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any
-    const sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any
-    return {...u, devices: dev.c, campaigns: camps.c, session: sess||null}
-  })
-  res.json(enriched)
+  try{
+    let users:any[]=[]
+    if(useMongo){
+      const User=mongoose.model('User')
+      const docs=await User.find().sort({created_at:-1}).lean() as any
+      users=docs.map((d:any)=>({ ...d, id:d._id, _id:d._id }))
+    } else {
+      users = db.prepare('SELECT id, username, role, is_super, is_active, allowed_ip, allowed_device, per_sim_limit, max_devices, expires_at, created_at FROM users ORDER BY created_at DESC').all() as any[]
+    }
+    const enriched = await Promise.all(users.map(async (u:any)=>{
+      let devC=0, campsC=0
+      try{
+        if(useMongo){
+          const {Device, Campaign} = await import('../db/index.js')
+          devC=await Device.countDocuments({status:'online'})
+          campsC=await Campaign.countDocuments()
+        } else {
+          devC = (db.prepare("SELECT COUNT(*) as c FROM devices WHERE status='online'").get() as any).c
+          campsC = (db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any).c
+        }
+      }catch{}
+      const sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any
+      return {...u, devices: devC, campaigns: campsC, session: sess||null}
+    }))
+    res.json(enriched)
+  }catch(e:any){ console.error('[admin users] err',e); res.status(500).json({error:e.message})}
 })
 
 // create user — fully Mongo
