@@ -1,0 +1,74 @@
+import { Router } from 'express'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { db } from '../db/index.js'
+import { config } from '../config/index.js'
+
+const router = Router()
+
+router.post('/login', (req, res) => {
+  const { username, password } = req.body || {}
+  if (!username || !password) return res.status(400).json({ error: 'username & password required' })
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any
+  if (!user) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
+  if(user.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
+  if(user.expires_at && new Date(user.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
+  const deviceId = (req.headers['x-device-id'] as string) || req.headers['user-agent']?.slice(0,80) || 'web'
+  // FIRST LOGIN auto-lock: agar allowed_ip/device khali hai to isi ip/device pe lock kar de
+  if((!user.allowed_ip || user.allowed_ip==='') && (!user.allowed_device || user.allowed_device==='')){
+    // super admin ko auto-lock nahi
+    if(user.is_super!==1){
+      db.prepare('UPDATE users SET allowed_ip=?, allowed_device=? WHERE id=?').run(ip, deviceId, user.id)
+      user.allowed_ip = ip
+      user.allowed_device = deviceId
+      console.log(`[Auth] First login lock ${user.username} → IP ${ip} Device ${deviceId.slice(0,20)}`)
+    }
+  } else {
+    // check IP
+    if(user.allowed_ip && user.allowed_ip!=='*' && user.allowed_ip!==''){
+      if(user.allowed_ip.includes('/')){
+        const base=user.allowed_ip.split('/')[0]
+        if(!ip.startsWith(base.slice(0, base.lastIndexOf('.')))) return res.status(403).json({ error: `IP not allowed (${ip})` })
+      } else if(ip!==user.allowed_ip){
+        if(!ip.includes('127.0.0.1') && ip!=='' ) return res.status(403).json({ error: `IP not allowed (${ip})` })
+      }
+    }
+    // check device
+    if(user.allowed_device && user.allowed_device!=='*' && user.allowed_device!==''){
+      if(deviceId !== user.allowed_device) return res.status(403).json({ error: `Device not allowed` })
+    }
+  }
+  const ok = bcrypt.compareSync(password, user.password_hash)
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
+  const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
+  db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id)
+  db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString())
+  res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
+  res.json({ token, user: { id: user.id, username: user.username, role: user.role, is_super: user.is_super } })
+})
+
+router.post('/logout', (req:any, res) => {
+  try{
+    const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
+    if(token){
+      const p:any = jwt.verify(token, config.JWT_SECRET)
+      db.prepare('DELETE FROM sessions WHERE user_id=?').run(p.id)
+    }
+  }catch{}
+  res.clearCookie('token', { path: '/' })
+  res.json({ ok: true })
+})
+
+router.get('/me', (req: any, res) => {
+  const raw = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : req.headers.authorization?.slice(7))
+  const token = raw as string
+  if (!token) return res.status(401).json({ error: 'No token' })
+  try {
+    const payload = jwt.verify(token, config.JWT_SECRET) as any
+    const u = db.prepare('SELECT is_super, is_active FROM users WHERE id=?').get(payload.id) as any
+    res.json({ user: {...payload, is_super: u?.is_super||0, is_active: u?.is_active} })
+  } catch { res.status(401).json({ error: 'Invalid' }) }
+})
+
+export default router

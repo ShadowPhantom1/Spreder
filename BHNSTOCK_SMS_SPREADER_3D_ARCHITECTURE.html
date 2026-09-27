@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>BHNSTOCK SMS SPREADER 3D — Brand New Day • Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#E30613;--red2:#9A0007;--blue:#0A1628;--blue2:#162447;--cyan:#00D9FF;--yellow:#FFD23F;--ink:#0E172A;--paper:#F8FAFC}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:#0A1628;color:#E2E8F0;font-family:'Space Grotesk',system-ui,sans-serif;line-height:1.6}
+a{color:var(--cyan);text-decoration:none}
+.mono{font-family:'JetBrains Mono',monospace}
+.display{font-family:'Bebas Neue','Anton',sans-serif;letter-spacing:.04em}
+.halftone{background-image:radial-gradient(circle at 1.2px 1.2px, rgba(227,6,19,.55) 1.2px, transparent 0);background-size:9px 9px}
+.web{position:relative;isolation:isolate}
+.web:before{content:'';position:absolute;inset:0;background:
+  radial-gradient(1100px 520px at 18% -8%, rgba(227,6,19,.18) 0%, transparent 62%),
+  radial-gradient(820px 520px at 92% 10%, rgba(0,217,255,.10) 0%, transparent 60%),
+  linear-gradient(180deg, #0A1628 0%, #0F2340 55%, #0A1628 100%);
+  z-index:-1}
+.top{position:sticky;top:0;z-index:40;background:rgba(10,22,40,.85);backdrop-filter:blur(14px) saturate(1.2);border-bottom:1px solid rgba(255,255,255,.08)}
+.top-inner{max-width:1180px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--red);color:#fff;font-weight:900;letter-spacing:.14em;font-size:11px}
+.card{background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.03));backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.10);border-radius:22px;box-shadow:0 12px 40px rgba(0,0,0,.35), 0 0 0 1px rgba(227,6,19,.14) inset}
+.glass{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:18px}
+.grid{max-width:1180px;margin:0 auto;padding:22px 18px}
+.hero{border-radius:28px;overflow:hidden;border:1.5px solid rgba(227,6,19,.35);box-shadow:0 0 50px rgba(227,6,19,.25), 0 18px 60px rgba(0,0,0,.5)}
+.hero-inner{padding:28px;display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:center}
+@media (max-width:900px){.hero-inner{grid-template-columns:1fr}}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:800px){.kpi{grid-template-columns:repeat(2,1fr)}}
+.kpi .box{padding:14px;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08)}
+.kpi .num{font-family:'Bebas Neue';font-size:30px;line-height:1}
+.toc{position:sticky;top:68px}
+.toc a{display:block;padding:8px 12px;border-radius:12px;color:#CBD5E1;font-size:13px;border:1px solid transparent}
+.toc a.active,.toc a:hover{background:rgba(227,6,19,.12);border-color:rgba(227,6,19,.25);color:#fff}
+.h2{font-family:'Bebas Neue';font-size:28px;letter-spacing:.06em;margin:0 0 8px}
+.h3{font-weight:900;letter-spacing:.08em;font-size:12px;color:var(--yellow);margin:18px 0 8px}
+.code{position:relative;background:#0B1220;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.6}
+.code .copy{position:absolute;top:8px;right:8px;padding:6px 10px;border-radius:999px;background:#fff;color:#0A1628;font-weight:900;font-size:11px;cursor:pointer;border:0}
+.table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:14px;border:1px solid rgba(255,255,255,.08)}
+.table th,.table td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid rgba(255,255,255,.06)}
+.table th{background:rgba(255,255,255,.06);font-size:11px;letter-spacing:.12em}
+.tag{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.08em;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+.swatch{width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.2);display:inline-block;vertical-align:middle;margin-right:6px}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flow .node{padding:10px 12px;border-radius:14px;background:#0B1220;border:1px solid rgba(255,255,255,.08);font-size:12px}
+.flow .arrow{font-weight:900;color:var(--yellow)}
+.diagram{padding:16px;border-radius:18px;background:#0B1220;border:1px solid rgba(255,255,255,.08);overflow:auto}
+.footer{padding:28px;text-align:center;color:#94A3B8;font-size:12px}
+@media print {.top,.toc-col{display:none} body{background:#fff;color:#111} .hero,.card{box-shadow:none} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#E30613,#9A0007);display:grid;place-items:center;font-family:'Bebas Neue';font-size:18px;letter-spacing:.12em;border:1.5px solid rgba(227,6,19,.6);box-shadow:0 0 18px rgba(227,6,19,.35)">BHN</div>
+      <div style="line-height:1">
+        <div class="display" style="font-size:20px">BHNSTOCK <span style="color:#E30613">SMS</span> SPREADER 3D</div>
+        <div class="mono" style="font-size:11px;letter-spacing:.16em;color:#94A3B8">BRAND NEW DAY • WEB-OS v3.0 • ARCHITECTURE</div>
+      </div>
+      <span class="badge" style="margin-left:8px">SPIDER-MAN EDITION 🕷️</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a href="#impl" class="badge" style="background:#fff;color:#0A1628">VIEW IMPLEMENTATION</a>
+      <span class="mono" style="font-size:11px;color:#94A3B8">2026-09-24 • Earth-616</span>
+    </div>
+  </div>
+  <div style="height:2px;background:linear-gradient(90deg,#E30613,#FFD23F,#00D9FF)"></div>
+</header>
+
+<div class="grid">
+  <section class="hero web">
+    <div class="halftone" style="position:absolute;inset:0;opacity:.12;pointer-events:none"></div>
+    <div class="hero-inner">
+      <div>
+        <span class="badge">🕸️ FULL-STACK • REAL-TIME • 3D WEB-OS</span>
+        <h1 class="display" style="font-size:44px;line-height:.9;margin:14px 0 8px">YOUR FRIENDLY<br><span style="background:linear-gradient(100deg,#FF2D3B,#E30613 45%,#FFD23F);-webkit-background-clip:text;-webkit-text-fill-color:transparent">NEIGHBORHOOD</span><br>SPREADER</h1>
+        <p style="color:#CBD5E1;max-width:560px">A modular SMS campaign OS that fans messages across <b>multiple Firebase RTDB hives</b> through <b>round-robin wave dispatch</b>, <b>ACK chasing</b>, and <b>live Socket.io observability</b> — wrapped in a Spidey Brand New Day 3D design system.</p>
+        <div class="flow" style="margin-top:14px">
+          <span class="tag"><span class="swatch" style="background:#E30613"></span> Spidey Red #E30613</span>
+          <span class="tag"><span class="swatch" style="background:#0A1628"></span> Night Blue #0A1628</span>
+          <span class="tag"><span class="swatch" style="background:#00D9FF"></span> Cyan #00D9FF</span>
+          <span class="tag"><span class="swatch" style="background:#FFD23F"></span> Eye Glint #FFD23F</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <a href="#stack" style="padding:10px 16px;border-radius:999px;background:#E30613;color:#fff;font-weight:900">STACK & FOLDERS →</a>
+          <a href="#logic" style="padding:10px 16px;border-radius:999px;background:#fff;color:#0A1628;font-weight:900">CORE LOGIC →</a>
+        </div>
+      </div>
+      <div class="kpi" style="grid-template-columns:1fr 1fr">
+        <div class="box"><div class="mono" style="font-size:10px;letter-spacing:.14em;color:#94A3B8">STACK</div><div class="num">React 18 • Vite 5</div><div class="mono" style="font-size:11px;color:#94A3B8">Express 4 • Socket.io 4</div></div>
+        <div class="box"><div class="mono" style="font-size:10px;letter-spacing:.14em;color:#94A3B8">DB</div><div class="num">SQLite WAL</div><div class="mono" style="font-size:11px;color:#94A3B8">better-sqlite3</div></div>
+        <div class="box"><div class="mono" style="font-size:10px;letter-spacing:.14em;color:#94A3B8">AUTH</div><div class="num">JWT + HttpOnly</div><div class="mono" style="font-size:11px;color:#94A3B8">bcrypt • cookies</div></div>
+        <div class="box"><div class="mono" style="font-size:10px;letter-spacing:.14em;color:#94A3B8">POLLER</div><div class="num">5s Hive Sweep</div><div class="mono" style="font-size:11px;color:#94A3B8">RTDB REST • ACK 15s</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:18px;margin-top:18px">
+    <aside class="toc-col">
+      <div class="card" style="padding:12px;top:78px;position:sticky">
+        <div class="mono" style="font-size:11px;letter-spacing:.14em;color:#94A3B8;padding:6px 8px">CONTENTS</div>
+        <nav class="toc mono">
+          <a href="#overview">01 — Overview</a>
+          <a href="#stack">02 — Stack & Structure</a>
+          <a href="#db">03 — Database Schema</a>
+          <a href="#firebase">04 — Firebase Service</a>
+          <a href="#queue">05 — Queue / Campaign Engine</a>
+          <a href="#poller">06 — Device Poller</a>
+          <a href="#auth">07 — Auth & Middleware</a>
+          <a href="#api">08 — API Routes</a>
+          <a href="#realtime">09 — Real-time (Socket.io)</a>
+          <a href="#frontend">10 — Frontend 3D System</a>
+          <a href="#impl">11 — Implementation Guide</a>
+          <a href="#deploy">12 — Deploy & Env</a>
+        </nav>
+        <div class="glass" style="padding:12px;margin-top:12px">
+          <div style="font-weight:900;font-size:12px;letter-spacing:.10em;color:#FFD23F">BRAND NEW DAY THEME</div>
+          <div style="font-size:12px;color:#CBD5E1;margin-top:6px">Red halftone • web mesh • glass 3D cards • NYC dusk gradient • swing & thwip motion. Every component has web-pattern, inner red rim light, and hover 3D tilt.</div>
+        </div>
+      </div>
+    </aside>
+
+    <main style="min-width:0">
+      <!-- Overview -->
+      <section id="overview" class="card" style="padding:18px">
+        <div class="h2">01 — OVERVIEW</div>
+        <p><b>BHNSTOCK SMS SPREADER 3D WEB</b> is a campaign command-center that turns a fleet of Android worker devices (each mirroring state into a Firebase RTDB) into a high-throughput SMS fabric. Operators create campaigns with templated messages (<code class="mono">Hello {{name}} … {{phone}}</code>), import contacts (phone + vars), and launch. The server fans messages out in <b>waves</b> across <b>online devices round-robin</b>, queues via RTDB REST, <b>waits for ACK</b>, retries once on timeout, and streams live progress over WebSockets.</p>
+        <div class="kpi" style="margin-top:12px">
+          <div class="box"><b>Multi-Hive</b><div class="mono" style="font-size:12px;color:#94A3B8">Many Firebase DBs under one roof. Per-hive health, latency, device counts.</div></div>
+          <div class="box"><b>Wave Dispatch</b><div class="mono" style="font-size:12px;color:#94A3B8">Batch + delay tunable. Round-robin balances load. Pause/Resume/Cancel live.</div></div>
+          <div class="box"><b>ACK Chase</b><div class="mono" style="font-size:12px;color:#94A3B8">ACK timeout 15s default. Retry once, then mark failed. Device counters.</div></div>
+          <div class="box"><b>Live UI</b><div class="mono" style="font-size:12px;color:#94A3B8">Socket.io pushes: campaign:progress, message:sent/failed, devices:update.</div></div>
+        </div>
+      </section>
+
+      <!-- Stack -->
+      <section id="stack" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">02 — TECHNOLOGY STACK & FOLDER STRUCTURE</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="h3">STACK</div>
+            <table class="table"><thead><tr><th>Layer</th><th>Tech</th><th>Notes</th></tr></thead><tbody>
+              <tr><td>Frontend</td><td>React 18 + Vite 5.4 + React Router 6</td><td>SPA, HMR proxy to :3000</td></tr>
+              <tr><td>Styling</td><td>Tailwind 3 + Framer Motion</td><td>Spidey tokens, 3D tilt, halftone</td></tr>
+              <tr><td>Backend</td><td>Node + Express 4</td><td>REST + static client</td></tr>
+              <tr><td>Realtime</td><td>Socket.io 4</td><td>Events to all clients</td></tr>
+              <tr><td>DB</td><td>better-sqlite3 (WAL)</td><td>File at ./data/sms.db</td></tr>
+              <tr><td>Validation</td><td>Zod</td><td>Env schema</td></tr>
+              <tr><td>Auth</td><td>JWT + bcrypt + cookie-parser</td><td>HttpOnly cookie</td></tr>
+            </tbody></table>
+          </div>
+          <div>
+            <div class="h3">FOLDERS</div>
+            <div class="code" style="font-size:12px">src/
+├─ server/
+│  ├─ config/index.ts      <span style="color:#94A3B8"># Zod env, ports, secrets</span>
+│  ├─ db/index.ts          <span style="color:#94A3B8"># WAL SQLite + schema + seed</span>
+│  ├─ middleware/auth.ts   <span style="color:#94A3B8"># JWT guard (cookie/Bearer)</span>
+│  ├─ services/
+│  │  ├─ firebaseService.ts<span style="color:#94A3B8"># REST poll/queue/ACK/seed</span>
+│  │  ├─ queueService.ts   <span style="color:#94A3B8"># wave engine + retry + control</span>
+│  │  └─ devicePoller.ts   <span style="color:#94A3B8"># 5s sweep, Socket emits</span>
+│  ├─ routes/{auth,firebases,devices,campaigns,settings}.ts
+│  └─ index.ts             <span style="color:#94A3B8"># app + io + static</span>
+└─ client/
+   ├─ components/Layout.tsx<span style="color:#94A3B8"># Spidey shell: header, nav, KPIs</span>
+   ├─ pages/{Dashboard,Campaigns,Devices,Firebases,Settings,Login}.tsx
+   ├─ lib/{api,utils}.ts
+   └─ index.css            <span style="color:#94A3B8"># mesh, halftone, 3D card</span>
+            </div>
+          </div>
+        </div>
+        <div class="h3">SCRIPTS</div>
+        <div class="code">npm run dev          <span style="color:#94A3B8"># concurrently: tsx watch server + vite client</span>
+npm run build        <span style="color:#94A3B8"># tsc + vite build → dist/</span>
+npm run start        <span style="color:#94A3B8"># node dist/server/index.js</span>
+        </div>
+      </section>
+
+      <!-- DB -->
+      <section id="db" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">03 — DATABASE SCHEMA (SQLite WAL)</div>
+        <div class="diagram mono" style="font-size:12px">
+          <b>firebases</b>(id PK, name, database_url, service_account_json, status, last_tested_at, device_count, created_at)<br>
+          <b>devices</b>(id PK, firebase_id FK→firebases, name, model, status[online|offline|busy], battery, signal, last_seen, total_sent, total_failed, created_at)<br>
+          <b>campaigns</b>(id PK, name, template, status[draft|running|paused|completed|cancelled], total, sent, failed, pending, batch_size, delay_ms, created_at, started_at, finished_at)<br>
+          <b>campaign_messages</b>(id PK, campaign_id FK, phone, variables JSON, rendered, status[pending|sending|sent|failed], device_id, firebase_id, attempts, last_error, sent_at, created_at)<br>
+          <b>queue_items</b>(id PK, campaign_id FK, message_id FK, priority, status[queued|dispatching|done|failed], created_at)<br>
+          <b>settings</b>(key PK, value, updated_at) • <b>users</b>(id PK, username UNIQUE, password_hash, role, created_at)
+        </div>
+        <div class="h3">KEY BEHAVIORS</div>
+        <ul style="margin:6px 0 0 18px;color:#CBD5E1;font-size:13px">
+          <li><code>campaign_messages.rendered</code> is template baked with <code>{{name}} {{phone}} {{custom}}</code> at creation — avoids re-render on retry.</li>
+          <li><code>queue_items</code> mirrors pending work; engine pulls <code>LIMIT batch_size WHERE status='queued'</code> per wave.</li>
+          <li>All writes that fan out (campaign create) run inside <code>db.transaction()</code>.</li>
+          <li>Admin seeded on boot via <code>ADMIN_USER / ADMIN_PASS</code> (bcrypt).</li>
+        </ul>
+        <div class="code" style="margin-top:10px"><button class="copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText)">COPY</button><span>-- pragma
+PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+-- seed demo hive if firebases empty
+INSERT INTO firebases VALUES('fb_demo_xxxx','BHNSTOCK • NYC Hive-01 (Demo)','https://bhnstock-demo-spiderverse.mock.firebaseio.com','online',...)</span></div>
+      </section>
+
+      <!-- Firebase -->
+      <section id="firebase" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">04 — FIREBASE SERVICE (REST, NO ADMIN SDK)</div>
+        <p class="mono" style="font-size:12px;color:#94A3B8">File: <b>src/server/services/firebaseService.ts</b> — pure fetch against RTDB REST. Mock-aware: any URL containing <code>mock|demo|bhnstock|example</code> synthesizes devices & ACKs for instant demos.</p>
+        <table class="table"><thead><tr><th>Method</th><th>REST / Logic</th><th>Details</th></tr></thead><tbody>
+          <tr><td><code>testConnection()</code></td><td><code>GET &lt;url&gt;/.json?shallow=true</code> or mock</td><td>Measures latency, returns {ok, latencyMs, message}</td></tr>
+          <tr><td><code>pollDevices()</code></td><td><code>GET &lt;url&gt;/devices.json</code> → map to {id,name,model,status,battery,signal}</td><td>Falls back to deterministic seeded synthetic pool (4–8 devices) if fetch fails or mock URL</td></tr>
+          <tr><td><code>queueSms()</code></td><td><code>PUT &lt;url&gt;/queue/{deviceId}/{messageId}.json</code></td><td>Mock path adds 180–350ms delay + 8% simulated fail</td></tr>
+          <tr><td><code>waitForAck()</code></td><td>Simulated + real-ready</td><td>600–1200ms → 82% delivered, 10% failed, 8% timeout. Honors timeoutMs</td></tr>
+          <tr><td><code>seedDevicesIfEmpty()</code></td><td>Ensures poll returns a pool</td><td>Used by UI “SEED” button</td></tr>
+        </tbody></table>
+        <div class="h3">SYNTHETIC DEVICE LOGIC</div>
+        <div class="code">hash = hashCode(firebase.id); count = 4 + |hash|%5;
+model = MODELS[(|hash|+i) % MODELS.length];
+online = seededRng(seed + i*100 + now/5000) > 0.18;
+busy   = online && rng() > 0.85;
+battery = 22 + rng()*78; signal = 55 + rng()*45;
+        </div>
+        <p style="font-size:13px;color:#CBD5E1">Why REST? No service-account friction; works with any RTDB URL, shallow checks are cheap. Real deployments can swap in Admin SDK by replacing these four functions — the rest of the system stays unchanged.</p>
+      </section>
+
+      <!-- Queue -->
+      <section id="queue" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">05 — QUEUE / CAMPAIGN ENGINE — THE WEB SHOOTER</div>
+        <p class="mono" style="font-size:12px;color:#94A3B8">File: <b>src/server/services/queueService.ts</b> — single-process, in-memory run-state, durable queue in SQLite.</p>
+        <div class="flow" style="margin:10px 0">
+          <span class="node">Campaign Draft<br><span class="mono" style="color:#94A3B8">contacts → dedupe → rendered</span></span>
+          <span class="arrow">→</span>
+          <span class="node">queue_items<br>queued × total</span>
+          <span class="arrow">→</span>
+          <span class="node">processCampaign()<br><span class="mono" style="color:#94A3B8">wave loop</span></span>
+          <span class="arrow">→</span>
+          <span class="node">dispatchItem()<br><span class="mono" style="color:#94A3B8">queueSms → waitForAck</span></span>
+          <span class="arrow">→</span>
+          <span class="node">done / retry / failed<br><span class="mono" style="color:#94A3B8">socket emits</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="h3">CREATE CAMPAIGN</div>
+            <ul style="margin:0 0 0 18px;font-size:13px;color:#CBD5E1">
+              <li>Dedupe by normalized phone (<code>^\+?[0-9]{7,15}$</code>), skip duplicates, collect invalid.</li>
+              <li>Render template once per contact: <code>{{name}} {{phone}} {{var}}</code> via regex replace.</li>
+              <li>Insert campaigns( pending=total ) + campaign_messages( pending ) + queue_items( queued ) in one transaction.</li>
+              <li>Emit <code>campaign:created</code>.</li>
+            </ul>
+            <div class="code" style="margin-top:8px">renderTemplate(tpl, vars, phone){
+  tpl.replace(/{{phone}}/gi, phone)
+     .replace(/{{name}}/gi, vars.name||'there')
+     .replace(/{{key}}/g, vars[key])
+}</div>
+          </div>
+          <div>
+            <div class="h3">WAVE LOOP (ROUND-ROBIN)</div>
+            <div class="code">state = {cancelled:false, paused:false}  // per campaign
+batch = campaign.batch_size || settings.dispatch_batch_size  // default 5
+delay = campaign.delay_ms   || settings.dispatch_delay_ms    // default 1200
+while(!cancelled){
+  if(paused) await sleep(500)
+  pending = SELECT … LIMIT batch WHERE status='queued'
+  if(!pending) break
+  devices = SELECT * WHERE status IN ('online','busy') // fallback: any 5
+  for each msg in pending (parallel wave):
+    device = devices[rrIdx++ % devices.length]
+    UPDATE queue_items → dispatching, messages → sending (+attempts)
+    emit message:sending
+    await queueSms(device, payload)
+    ack = await waitForAck(timeout=ack_timeout_ms)
+    if ack.ack → sent/done, sent++, pending--, device.total_sent++
+    else if attempts&lt;2 && ack.status!='failed' → requeue queued/pending
+    else → failed, failed++, pending--, device.total_failed++
+    emit message:sent|failed|retry
+  emit campaign:progress {sent, failed, pending, total}
+  await sleep(delay)
+}
+→ completed if pending==0 else paused/cancelled</div>
+          </div>
+        </div>
+        <div class="h3">CONTROL SURFACE</div>
+        <table class="table"><thead><tr><th>Op</th><th>What</th><th>Guard</th></tr></thead><tbody>
+          <tr><td><code>start</code></td><td>Sets running, fires processCampaign (fire-and-forget)</td><td>Not already running/completed/cancelled</td></tr>
+          <tr><td><code>pause</code></td><td>Flips paused=true, DB status=paused</td><td>In-memory flag + DB row</td></tr>
+          <tr><td><code>resume</code></td><td>Clears paused, status=running, restarts loop if needed</td><td>Handles cold resume (not in memory)</td></tr>
+          <tr><td><code>cancel</code></td><td>cancelled=true, status=cancelled, deletes run-state</td><td>Loop exits next tick</td></tr>
+        </tbody></table>
+        <p style="font-size:12px;color:#94A3B8" class="mono">Concurrency: one loop per campaign (Map&lt;campaignId,state&gt;). Waves fan out with Promise.all per batch; cross-campaign concurrency is sequential per campaign but parallel across campaigns.</p>
+      </section>
+
+      <!-- Poller -->
+      <section id="poller" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">06 — DEVICE POLLER</div>
+        <p class="mono" style="font-size:12px;color:#94A3B8">File: <b>src/server/services/devicePoller.ts</b> — interval sweeper, Socket broadcaster.</p>
+        <div class="code">attachIO(io) → interval = setInterval(pollAll, poll_interval_ms) // default 5000
+pollAll(){
+  for each firebase in firebases:
+    devices = await firebaseService.pollDevices(fb)
+    upsert devices (ON CONFLICT id DO UPDATE)
+    UPDATE firebases SET device_count, status='online'
+    io.emit('devices:update',{firebaseId, count, devices:slice(0,8)})
+    io.emit('firebases:update',{id, device_count, status})
+  io.emit('stats:devices',{online, offline, busy, total})
+}</div>
+        <ul style="margin:8px 0 0 18px;font-size:13px;color:#CBD5E1">
+          <li>Starts on server boot; auto-seeds demo hive if table empty.</li>
+          <li>Upsert uses <code>INSERT … ON CONFLICT(id) DO UPDATE</code> to keep phone/battery fresh without losing counters.</li>
+          <li>All intervals read from <code>settings</code> table (live-tunable via Settings page).</li>
+        </ul>
+      </section>
+
+      <!-- Auth -->
+      <section id="auth" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">07 — AUTH & MIDDLEWARE</div>
+        <table class="table"><thead><tr><th>Piece</th><th>How</th></tr></thead><tbody>
+          <tr><td>Seeding</td><td>On boot: if no users where username=ADMIN_USER → bcrypt.hash(ADMIN_PASS) → insert.</td></tr>
+          <tr><td>Login</td><td>POST /api/auth/login {username,password} → bcrypt.compare → jwt.sign({id,username,role}, JWT_SECRET, {expiresIn: JWT_EXPIRY}) → Set-Cookie token HttpOnly SameSite=lax 7d + JSON {token,user}</td></tr>
+          <tr><td>Guard</td><td><code>authRequired</code> reads cookie token or Authorization: Bearer — jwt.verify → req.user. Returns 401 with “web snapped” messages if missing/invalid.</td></tr>
+          <tr><td>Logout</td><td>POST /api/auth/logout → clearCookie(token)</td></tr>
+          <tr><td>Client</td><td>Login page stores token in localStorage, fetch wrapper sends credentials:'include' + JSON. Guard component checks /api/auth/me.</td></tr>
+        </tbody></table>
+      </section>
+
+      <!-- API -->
+      <section id="api" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">08 — API ROUTES</div>
+        <table class="table"><thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Purpose</th></tr></thead><tbody>
+          <tr><td>GET</td><td>/api/health</td><td>—</td><td>Service banner + time</td></tr>
+          <tr><td>GET</td><td>/api/stats</td><td>—</td><td>Counts: firebases, devices(online/offline/busy/total), campaigns(total/running/completed/draft, totalSent/Failed)</td></tr>
+          <tr><td>POST</td><td>/api/auth/login</td><td>—</td><td>JWT + cookie</td></tr>
+          <tr><td>POST</td><td>/api/auth/logout</td><td>—</td><td>Clear</td></tr>
+          <tr><td>GET</td><td>/api/auth/me</td><td>cookie</td><td>Verify</td></tr>
+          <tr><td>GET/POST</td><td>/api/firebases</td><td>✓</td><td>List / Create</td></tr>
+          <tr><td>PUT/DELETE</td><td>/api/firebases/:id</td><td>✓</td><td>Update / Delete</td></tr>
+          <tr><td>POST</td><td>/api/firebases/:id/test</td><td>✓</td><td>Latency + ok</td></tr>
+          <tr><td>POST</td><td>/api/firebases/:id/seed</td><td>✓</td><td>Seed demo bots</td></tr>
+          <tr><td>POST</td><td>/api/firebases/bulk</td><td>✓</td><td>Import many</td></tr>
+          <tr><td>GET</td><td>/api/devices?firebase_id&status&q</td><td>✓</td><td>Filter + search ≤200</td></tr>
+          <tr><td>GET</td><td>/api/devices/:id</td><td>✓</td><td>Detail</td></tr>
+          <tr><td>GET</td><td>/api/campaigns</td><td>✓</td><td>List</td></tr>
+          <tr><td>POST</td><td>/api/campaigns</td><td>✓</td><td>Create (name, template, contacts|contactsText, batch_size, delay_ms)</td></tr>
+          <tr><td>GET</td><td>/api/campaigns/:id</td><td>✓</td><td>Detail</td></tr>
+          <tr><td>GET</td><td>/api/campaigns/:id/messages?status&limit&offset</td><td>✓</td><td>Message slice</td></tr>
+          <tr><td>POST</td><td>/api/campaigns/:id/start|pause|resume|cancel</td><td>✓</td><td>Controls</td></tr>
+          <tr><td>DELETE</td><td>/api/campaigns/:id</td><td>✓</td><td>Delete</td></tr>
+          <tr><td>GET/PUT</td><td>/api/settings</td><td>✓</td><td>Read / Upsert</td></tr>
+        </tbody></table>
+        <div class="h3">CONTACT INGEST FORMATS</div>
+        <div class="code">// JSON
+contacts: [{phone:"+9199…", vars:{name:"Peter", otp:"4829"}}, …]
+// Text (UI textarea / contactsText)
++919999000001, Peter
++919999000002, Miles
++919999000003, Gwen   → parsed as {phone, vars:{name}}
+// Validation
+/^\+?[0-9]{7,15}$/  duplicates skipped, invalid collected → returned as {invalid: [...]}</div>
+      </section>
+
+      <!-- Realtime -->
+      <section id="realtime" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">09 — REAL-TIME LAYER (Socket.io)</div>
+        <table class="table"><thead><tr><th>Event</th><th>Direction</th><th>Payload</th></tr></thead><tbody>
+          <tr><td>hello</td><td>server → client</td><td>{message, id}</td></tr>
+          <tr><td>devices:update</td><td>server → all</td><td>{firebaseId, count, devices[]}</td></tr>
+          <tr><td>firebases:update</td><td>server → all</td><td>{id, device_count, status}</td></tr>
+          <tr><td>stats:devices</td><td>server → all</td><td>{online, offline, busy, total}</td></tr>
+          <tr><td>campaign:created/status/progress/completed</td><td>server → all</td><td>{campaignId, status|sent/failed/pending/total}</td></tr>
+          <tr><td>message:sending/sent/failed/retry</td><td>server → all</td><td>{campaignId, messageId, phone, reason?}</td></tr>
+          <tr><td>campaign:log</td><td>server → all</td><td>{campaignId, level, msg}</td></tr>
+        </tbody></table>
+        <p style="font-size:13px;color:#CBD5E1">Client subscribes with <code>socket.io-client</code>; Dashboard polls stats every 4s as fallback, but socket pushes keep counters live without polling.</p>
+      </section>
+
+      <!-- Frontend -->
+      <section id="frontend" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">10 — FRONTEND — SPIDER-MAN BRAND NEW DAY 3D SYSTEM</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="h3">DESIGN TOKENS</div>
+            <table class="table"><thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead><tbody>
+              <tr><td>spidey.red</td><td>#E30613</td><td>Primary, web line, badges</td></tr>
+              <tr><td>spidey.red-dark</td><td>#9A0007</td><td>Gradient depth, hover</td></tr>
+              <tr><td>spidey.blue</td><td>#0A1628</td><td>Shell, card base</td></tr>
+              <tr><td>spidey.blue-light</td><td>#162447</td><td>Card top gradient</td></tr>
+              <tr><td>spidey.cyan</td><td>#00D9FF</td><td>Signal, accents</td></tr>
+              <tr><td>spidey.yellow</td><td>#FFD23F</td><td>Eye glint, highlight</td></tr>
+              <tr><td>Fonts</td><td>Bebas Neue / Anton + Space Grotesk + JetBrains Mono</td><td>Display / body / mono</td></tr>
+            </tbody></table>
+            <div class="h3">EFFECTS</div>
+            <ul style="margin:0 0 0 18px;font-size:13px;color:#CBD5E1">
+              <li><code>bg-spidey-mesh</code> — triple radial + linear dusk gradient.</li>
+              <li><code>web-pattern</code> — dot grid (28px), <code>halftone</code> — comic dots (10px).</li>
+              <li><code>web-lines</code> — SVG concentric web overlay.</li>
+              <li><code>card-3d</code> — perspective 900px rotateX/Y + translateZ on hover.</li>
+              <li><code>comic-border</code> — inset red rim + outer glow; <code>glass-spidey</code> — blur16 + saturate.</li>
+              <li><code>shimmer</code> — diagonal sweep on campaign cards.</li>
+              <li>Header has web-line (red→yellow→cyan) + halftone watermark.</li>
+            </ul>
+          </div>
+          <div>
+            <div class="h3">PAGES</div>
+            <table class="table"><thead><tr><th>Route</th><th>File</th><th>What it does</th></tr></thead><tbody>
+              <tr><td>/login</td><td>Login.tsx</td><td>Giant web SVG, mask card, demo creds</td></tr>
+              <tr><td>/</td><td>Dashboard.tsx</td><td>Hero + 3D KPIs + live log + recent webs + bots/hives</td></tr>
+              <tr><td>/campaigns</td><td>Campaigns.tsx</td><td>Filter pills, 3D cards, wave controls, new-campaign modal (template + preview + contacts textarea + sliders), messages drawer</td></tr>
+              <tr><td>/devices</td><td>Devices.tsx</td><td>Phone mockups, battery/signal bars, live search/status filter</td></tr>
+              <tr><td>/firebases</td><td>Firebases.tsx</td><td>Connect, bulk CSV, Test/Seed/Delete, status pills</td></tr>
+              <tr><td>/settings</td><td>Settings.tsx</td><td>Poll/batch/delay/ACK tunables, “How it works” explainer</td></tr>
+            </tbody></table>
+            <div class="h3">SHELL (Layout.tsx)</div>
+            <div class="code" style="font-size:12px">Header: mask logo + WEB-OS badge + live online/total + friendly tag + avatar
+Sidebar: nav pills (active = red gradient glow) + Brand New Day promo + mini KPIs + fixed overlay on mobile
+Main: max 1600px, padded, routed
+Socket: stats poll every 4s fallback
+            </div>
+          </div>
+        </div>
+        <div class="h3">ROUTE MAP VISUAL</div>
+        <div class="flow mono" style="font-size:12px">
+          <span class="node">/login<br>mask + web</span><span class="arrow">→ Guard(/api/auth/me) →</span>
+          <span class="node">/  Dashboard<br>hero + KPIs + log</span><span class="arrow">↔</span>
+          <span class="node">/campaigns<br>cards + modal + drawer</span><span class="arrow">↔</span>
+          <span class="node">/devices<br>phone grid</span><span class="arrow">↔</span>
+          <span class="node">/firebases<br>hives</span><span class="arrow">↔</span>
+          <span class="node">/settings<br>tunables</span>
+        </div>
+      </section>
+
+      <!-- Implementation -->
+      <section id="impl" class="card" style="padding:18px;margin-top:14px;border-color:rgba(255,210,63,.35)">
+        <div class="h2">11 — IMPLEMENTATION — RECREATING CLEANLY</div>
+        <p>This repo is the clean rebuild. Every layer above is implemented in the file tree. To reproduce from scratch:</p>
+        <div class="code"><button class="copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText)">COPY</button><span># 1) scaffold
+npm create vite@latest -- --template react-ts
+npm i express better-sqlite3 bcryptjs cookie-parser cors jsonwebtoken socket.io socket.io-client zod
+npm i -D tsx concurrently @types/node @types/express @types/better-sqlite3 @types/bcryptjs @types/cookie-parser @types/cors @types/jsonwebtoken
+npm i react-router-dom lucide-react framer-motion recharts clsx tailwind-merge
+npx tailwindcss init -p
+
+# 2) copy src/server/* + src/client/* from this project
+# 3) configure vite.config.ts proxy:
+proxy: { '/api':'http://localhost:3000', '/socket.io':{target:'http://localhost:3000', ws:true} }
+
+# 4) env (or rely on defaults in config/index.ts)
+PORT=3000
+JWT_SECRET=change-me-32chars-min
+ADMIN_USER=admin
+ADMIN_PASS=admin123456
+DATABASE_PATH=./data/sms.db
+
+# 5) run
+npm run dev        # :5173 (vite) + :3000 (api)
+# production
+npm run build && npm start   # serves dist/client via express.static
+</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div class="glass" style="padding:12px">
+            <div class="h3" style="margin-top:0">CRITICAL LOGIC TO KEEP</div>
+            <ul style="margin:0 0 0 18px;font-size:13px;color:#CBD5E1">
+              <li>Dedupe + template render at create-time (not dispatch-time).</li>
+              <li>Transaction wrapping campaign inserts.</li>
+              <li>Round-robin index surviving across waves.</li>
+              <li>Re-queue on timeout (attempts&lt;2) else fail — preserves at-least-once without spam.</li>
+              <li>Poller upsert + firebases device_count sync + io emits.</li>
+              <li>Auth reads both cookie and Bearer for flexibility.</li>
+            </ul>
+          </div>
+          <div class="glass" style="padding:12px">
+            <div class="h3" style="margin-top:0">SPIDEY UI CHECKLIST</div>
+            <ul style="margin:0 0 0 18px;font-size:13px;color:#CBD5E1">
+              <li>Tailwind tokens spidey.* + halftone + web-pattern utilities.</li>
+              <li>Layout header web gradient line (red→yellow→cyan).</li>
+              <li>Cards: card-3d hover tilt + comic-border + halftone watermark.</li>
+              <li>Hero concentric web circles + halftone + glass KPI tiles.</li>
+              <li>Login giant web SVG (0.04 opacity) + mask logo.</li>
+              <li>Empty states: “shoot your first web 🕷️”.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="h3">WHAT’S WIRED vs MOCK</div>
+        <p style="font-size:13px;color:#CBD5E1">Firebase layer is REST-ready: point <code>database_url</code> at a real RTDB and <code>pollDevices/queueSms/waitForAck</code> will hit live endpoints. The mock fallback (URL contains mock/demo/bhnstock/example) keeps the demo fully functional without credentials — latency, online ratios, battery/signal all stay realistic so the 3D UI feels alive.</p>
+      </section>
+
+      <!-- Deploy -->
+      <section id="deploy" class="card" style="padding:18px;margin-top:14px">
+        <div class="h2">12 — DEPLOY & ENV</div>
+        <table class="table"><thead><tr><th>Var</th><th>Default</th><th>Notes</th></tr></thead><tbody>
+          <tr><td>NODE_ENV</td><td>development</td><td></td></tr>
+          <tr><td>PORT / HOST</td><td>3000 / 0.0.0.0</td><td>Vite proxy expects 3000</td></tr>
+          <tr><td>JWT_SECRET</td><td>dev-secret-change… (must be ≥32 chars in prod)</td><td></td></tr>
+          <tr><td>JWT_EXPIRY</td><td>7d</td><td></td></tr>
+          <tr><td>ADMIN_USER / ADMIN_PASS</td><td>admin / admin123456</td><td>Seeded on first boot</td></tr>
+          <tr><td>DATABASE_PATH</td><td>./data/sms.db</td><td>WAL mode</td></tr>
+          <tr><td>POLL_INTERVAL_MS</td><td>5000</td><td>Also in settings table</td></tr>
+          <tr><td>DISPATCH_BATCH_SIZE</td><td>5</td><td></td></tr>
+          <tr><td>DISPATCH_DELAY_MS</td><td>1200</td><td></td></tr>
+          <tr><td>ACK_TIMEOUT_MS</td><td>15000</td><td></td></tr>
+        </tbody></table>
+        <div class="h3">PRODUCTION CHECKS</div>
+        <ul style="margin:0 0 0 18px;font-size:13px;color:#CBD5E1">
+          <li>Set <code>JWT_SECRET</code> to 32+ random chars; change <code>ADMIN_PASS</code>.</li>
+          <li>Persist <code>./data</code> volume; WAL needs file lock.</li>
+          <li>Put behind HTTPS; cookies already HttpOnly + SameSite=lax.</li>
+          <li>If using real Firebase, add service-account JSON to hive record and switch firebaseService to Admin SDK (isolated change).</li>
+        </ul>
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+          <span class="tag">npm run build → dist/client + dist/server</span>
+          <span class="tag">npm start → Express serves API + static + Socket.io</span>
+          <span class="tag">Health: GET /api/health</span>
+        </div>
+      </section>
+
+      <div class="footer mono">
+        Built with 🕷️ for BHNSTOCK • Brand New Day — “Anyone can wear the mask. The code just makes the web hold.”<br>
+        Single-file architecture doc • Print with ⌘P • © 2026 BHNSTOCK SMS SPREADER 3D WEB
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// active toc
+const links=[...document.querySelectorAll('.toc a')], secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+const onScroll=()=>{ let idx=0; for(let i=0;i<secs.length;i++){ if(secs[i] && secs[i].getBoundingClientRect().top < 120) idx=i } links.forEach((l,i)=> l.classList.toggle('active', i===idx)) };
+document.addEventListener('scroll', onScroll); onScroll();
+</script>
+</body>
+</html>

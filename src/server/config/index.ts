@@ -1,0 +1,20 @@
+import { z } from 'zod'
+
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  HOST: z.string().default('0.0.0.0'),
+  JWT_SECRET: z.string().min(32).default('dev-secret-change-in-production-min-32-chars!!'),
+  JWT_EXPIRY: z.string().default('7d'),
+  ADMIN_USER: z.string().default('admin'),
+  ADMIN_PASS: z.string().min(8).default('admin123456'),
+  DATABASE_PATH: z.string().default('./data/sms.db'),
+  MONGODB_URI: z.string().optional().default(''),
+  POLL_INTERVAL_MS: z.coerce.number().default(5000),
+  DISPATCH_BATCH_SIZE: z.coerce.number().default(5),
+  DISPATCH_DELAY_MS: z.coerce.number().default(1200),
+  ACK_TIMEOUT_MS: z.coerce.number().default(15000),
+})
+
+export const config = EnvSchema.parse(process.env)
+export type Config = typeof config

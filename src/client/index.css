@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --spidey-red:#E30613;
+  --spidey-blue:#0A1628;
+  --spidey-cyan:#00D9FF;
+}
+*{scrollbar-width:thin; scrollbar-color: #E30613 #0A1628;}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0A1628}
+::-webkit-scrollbar-thumb{background:#E30613;border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:#FF2D3B}
+
+/* Spidey web backdrop */
+.bg-spidey-mesh{
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(227,6,19,0.22) 0%, transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, rgba(0,217,255,0.12) 0%, transparent 55%),
+    radial-gradient(800px 600px at 50% 120%, rgba(227,6,19,0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #0A1628 0%, #0F2340 55%, #0A1628 100%);
+}
+.web-pattern{
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.09) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+.halftone{
+  background-image: radial-gradient(circle at 1.5px 1.5px, rgba(227,6,19,0.55) 1.5px, transparent 0);
+  background-size: 10px 10px;
+}
+.web-lines{
+  background-image: url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0 L400 400 M400 0 L0 400 M200 0 L200 400 M0 200 L400 200' stroke='rgba(255,255,255,0.04)' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='60' fill='none' stroke='rgba(227,6,19,0.08)' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='120' fill='none' stroke='rgba(227,6,19,0.05)' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='180' fill='none' stroke='rgba(0,217,255,0.06)' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+/* 3D card */
+.card-3d{
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.23,1,0.32,1), box-shadow 0.4s;
+}
+.card-3d:hover{
+  transform: perspective(900px) rotateX(2deg) rotateY(-3deg) translateY(-4px) translateZ(10px);
+}
+
+/* Comic stroke */
+.comic-border{
+  border: 2px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 0 0 1px rgba(227,6,19,0.35) inset,
+    0 8px 32px rgba(0,0,0,0.45),
+    0 0 40px rgba(227,6,19,0.12);
+}
+.comic-border-red{
+  border: 1.5px solid rgba(227,6,19,0.6);
+  box-shadow: 0 0 24px rgba(227,6,19,0.28), 0 8px 24px rgba(0,0,0,0.4);
+}
+
+/* Text gradients */
+.text-spidey-gradient{
+  background: linear-gradient(100deg, #FF2D3B 0%, #E30613 35%, #FFD23F 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.glass-spidey{
+  background: linear-gradient(135deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.03) 100%);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+/* Thwip underline */
+.thwip-underline{
+  position: relative;
+}
+.thwip-underline:after{
+  content:'';
+  position:absolute;
+  left:0; bottom:-6px;
+  width:100%; height:3px;
+  background: linear-gradient(90deg, #E30613 0%, #FFD23F 50%, #00D9FF 100%);
+  border-radius: 999px;
+  transform: scaleX(0.75);
+  transform-origin: left;
+  transition: transform 0.3s;
+}
+.thwip-underline:hover:after{ transform: scaleX(1); }
+
+/* Shimmer */
+.shimmer{
+  position: relative; overflow: hidden;
+}
+.shimmer:after{
+  content:'';
+  position:absolute; inset:0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: shimmerMove 2.2s infinite;
+}
+@keyframes shimmerMove{ 100%{ transform: translateX(100%) } }
+
+/* Spidey loader web */
+@keyframes webGrow{
+  0%{ stroke-dasharray: 0 1000; opacity:0 }
+  60%{ opacity:1 }
+  100%{ stroke-dasharray: 1000 0; opacity:0.9 }
+}
+
+/* PHONK AURA — neon purple/pink/cyan, phonk vibe */
+.phonk-aura{
+  position:absolute; inset:-20%;
+  background:
+    radial-gradient(700px 400px at 20% 20%, rgba(139,92,246,0.22) 0%, transparent 60%),
+    radial-gradient(600px 500px at 80% 10%, rgba(236,72,153,0.18) 0%, transparent 60%),
+    radial-gradient(500px 600px at 50% 90%, rgba(14,165,233,0.14) 0%, transparent 60%),
+    radial-gradient(900px 500px at 50% 50%, rgba(227,6,19,0.10) 0%, transparent 70%);
+  filter: blur(18px) saturate(1.4);
+  animation: phonkShift 8s ease-in-out infinite alternate, phonkHue 12s linear infinite;
+  pointer-events:none;
+}
+@keyframes phonkShift{
+  0%{ transform: scale(1) translate(0,0) rotate(0deg); opacity:0.9 }
+  50%{ transform: scale(1.08) translate(12px,-8px) rotate(1deg); opacity:1 }
+  100%{ transform: scale(1.02) translate(-8px,6px) rotate(-1deg); opacity:0.95 }
+}
+@keyframes phonkHue{
+  0%{ filter: blur(18px) saturate(1.4) hue-rotate(0deg) }
+  100%{ filter: blur(18px) saturate(1.4) hue-rotate(18deg) }
+}
+.phonk-glow{
+  box-shadow: 0 0 30px rgba(139,92,246,0.35), 0 0 60px rgba(236,72,153,0.22), 0 0 90px rgba(14,165,233,0.12);
+}
+.phonk-text{
+  background: linear-gradient(100deg, #8B5CF6 0%, #EC4899 35%, #06B6D4 70%, #FFD23F 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 12px rgba(139,92,246,0.5));
+}
+@keyframes floatPhonk{
+  0%,100%{ transform: translateY(0) rotate(-1deg) scale(1) }
+  50%{ transform: translateY(-10px) rotate(1deg) scale(1.02) }
+}
+

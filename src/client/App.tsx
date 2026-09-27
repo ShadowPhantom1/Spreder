@@ -1,0 +1,40 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import Layout from './components/Layout'
+import Dashboard from './pages/Dashboard'
+import Campaigns from './pages/Campaigns'
+import Devices from './pages/Devices'
+import Firebases from './pages/Firebases'
+import Settings from './pages/Settings'
+import Admin from './pages/Admin'
+import Docs from './pages/Docs'
+import Login from './pages/Login'
+
+// OPEN_MODE syncs with server DISABLE_AUTH — true for preview, false for prod
+const OPEN_MODE = (import.meta as any).env?.VITE_OPEN_MODE !== 'false'
+
+function Guard({ children }: { children: React.ReactNode }){
+  if (OPEN_MODE) return <>{children}</>
+  // when OPEN_MODE false, verify session — if no token, redirect
+  const t = (()=>{ try{ return localStorage.getItem('token') }catch{ return null } })()
+  if(!t) return <>{children}</> // will be caught by api 401 and redirect in Layout
+  return <>{children}</>
+}
+
+export default function App(){
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login/>} />
+        <Route path="/" element={<Guard><Layout><Dashboard/></Layout></Guard>} />
+        <Route path="/campaigns" element={<Guard><Layout><Campaigns/></Layout></Guard>} />
+        <Route path="/devices" element={<Guard><Layout><Devices/></Layout></Guard>} />
+        <Route path="/firebases" element={<Guard><Layout><Firebases/></Layout></Guard>} />
+        <Route path="/settings" element={<Guard><Layout><Settings/></Layout></Guard>} />
+        <Route path="/admin" element={<Guard><Layout><Admin/></Layout></Guard>} />
+        <Route path="/super" element={<Guard><Layout><Admin/></Layout></Guard>} />
+        <Route path="/docs" element={<Guard><Layout><Docs/></Layout></Guard>} />
+        <Route path="*" element={<Navigate to="/" replace/>} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
