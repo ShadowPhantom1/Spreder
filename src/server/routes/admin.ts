@@ -8,7 +8,7 @@ import mongoose from 'mongoose'
 const r = Router()
 r.use(authRequired, superRequired)
 
-// list all users + stats — fully Mongo
+// list all users + stats — fully Mongo (optimized — single queries)
 r.get('/users', async (req,res)=>{
   try{
     let users:any[]=[]
@@ -19,28 +19,39 @@ r.get('/users', async (req,res)=>{
     } else {
       users = db.prepare('SELECT id, username, role, is_super, is_active, allowed_device, per_sim_limit, max_devices, expires_at, created_at FROM users ORDER BY created_at DESC').all() as any[]
     }
-    const enriched = await Promise.all(users.map(async (u:any)=>{
-      let devC=0, campsC=0
-      try{
-        if(useMongo){
-          const {Device, Campaign} = await import('../db/index.js')
-          devC=await Device.countDocuments({status:'online'})
-          campsC=await Campaign.countDocuments()
-        } else {
-          devC = (db.prepare("SELECT COUNT(*) as c FROM devices WHERE status='online'").get() as any).c
-          campsC = (db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any).c
+    // single-shot counts (was per-user — slow)
+    let devC=0, campsC=0
+    try{
+      if(useMongo){
+        const {Device, Campaign} = await import('../db/index.js')
+        const [d,c]=await Promise.all([Device.countDocuments({status:'online'}), Campaign.countDocuments()])
+        devC=d; campsC=c
+      } else {
+        devC = (db.prepare("SELECT COUNT(*) as c FROM devices WHERE status='online'").get() as any).c
+        campsC = (db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any).c
+      }
+    }catch{}
+    // bulk sessions — one query for all users
+    let sessMap = new Map<string, any>()
+    try{
+      if(useMongo){
+        const {Session}=await import('../db/index.js')
+        const ids = users.map(u=>u.id)
+        const sessions = await Session.find({$or:[{_id:{$in:ids}}, {user_id:{$in:ids}}]}).lean() as any[]
+        for(const s of sessions){
+          const key = s.user_id || s._id
+          if(!sessMap.has(key)) sessMap.set(key, {ip:s.ip, device_id:s.device_id, last_active:s.last_active})
         }
-      }catch{}
+      }
+    }catch{}
+    const enriched = users.map((u:any)=>{
       let sess:any=null
-      try{
-        const {Session} = await import('../db/index.js')
-        sess = await Session.findOne({_id: u.id} as any).lean() || await Session.findOne({user_id: u.id}).lean()
-        if(sess) sess = {ip:sess.ip, device_id:sess.device_id, last_active:sess.last_active}
-      }catch{
-        sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any
+      if(sessMap.has(u.id)) sess = sessMap.get(u.id)
+      else {
+        try{ sess = db.prepare('SELECT ip, device_id, last_active FROM sessions WHERE user_id=?').get(u.id) as any }catch{}
       }
       return {...u, devices: devC, campaigns: campsC, session: sess||null}
-    }))
+    })
     res.json(enriched)
   }catch(e:any){ console.error('[admin users] err',e); res.status(500).json({error:e.message})}
 })
