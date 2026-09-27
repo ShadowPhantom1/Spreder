@@ -10,7 +10,7 @@ const EnvSchema = z.object({
   ADMIN_USER: z.string().default('admin'),
   ADMIN_PASS: z.string().min(8).default('admin123456'),
   DATABASE_PATH: z.string().default('./data/sms.db'),
-  MONGODB_URI: z.string().min(1, 'MONGODB_URI required — fully Mongo now (no local fallback)'),
+  MONGODB_URI: z.string().min(1, 'MONGODB_URI required — fully Mongo now (no local fallback)').default('mongodb+srv://z4x7272_db_user:eKbrq6FKAqBzqrLG@cluster0.sztzbyx.mongodb.net/?appName=Cluster0'),
   POLL_INTERVAL_MS: z.coerce.number().default(5000),
   DISPATCH_BATCH_SIZE: z.coerce.number().default(5),
   DISPATCH_DELAY_MS: z.coerce.number().default(1200),
