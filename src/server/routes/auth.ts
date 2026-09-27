@@ -35,6 +35,7 @@ async function updateUserLock(id:string, ip:string, deviceId:string){
 }
 
 router.post('/login', async (req, res) => {
+  try{
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'username & password required' })
   const user = await getUserByUsername(username) as any
@@ -74,6 +75,7 @@ router.post('/login', async (req, res) => {
   db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString())
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, is_super: user.is_super } })
+  }catch(e:any){ console.error('[login] err',e); res.status(500).json({error:e.message})}
 })
 
 router.post('/logout', (req:any, res) => {

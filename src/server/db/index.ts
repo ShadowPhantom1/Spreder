@@ -10,7 +10,7 @@ export const db = new Database(config.DATABASE_PATH)
 db.pragma('journal_mode = WAL')
 db.pragma('synchronous = NORMAL')
 db.pragma('wal_autocheckpoint = 1000')
-db.pragma('foreign_keys = ON')
+db.pragma('foreign_keys = OFF')
 
 // Mongo fully — no local fallback for users (other tables still SQLite for now, next full migration)
 import mongoose from 'mongoose'
@@ -128,7 +128,8 @@ try{ db.exec("ALTER TABLE users ADD COLUMN allowed_device TEXT") }catch{}
 try{ db.exec("ALTER TABLE users ADD COLUMN per_sim_limit INTEGER DEFAULT 100") }catch{}
 try{ db.exec("ALTER TABLE users ADD COLUMN max_devices INTEGER DEFAULT 100") }catch{}
 try{ db.exec("ALTER TABLE users ADD COLUMN expires_at TEXT") }catch{}
-try{ db.exec("CREATE TABLE IF NOT EXISTS sessions (user_id TEXT PRIMARY KEY, ip TEXT, device_id TEXT, token TEXT, last_active TEXT, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)") }catch{}
+try{ db.exec("CREATE TABLE IF NOT EXISTS sessions (user_id TEXT PRIMARY KEY, ip TEXT, device_id TEXT, token TEXT, last_active TEXT)") }catch{}
+try{ db.exec("DROP TRIGGER IF EXISTS fk_sessions") }catch{}
 try{ db.exec("ALTER TABLE devices ADD COLUMN validated_score INTEGER DEFAULT 0") }catch{}
 try{ db.exec("ALTER TABLE devices ADD COLUMN validated_at TEXT") }catch{}
 try{ db.exec("ALTER TABLE devices ADD COLUMN validator_fail_count INTEGER DEFAULT 0") }catch{}
