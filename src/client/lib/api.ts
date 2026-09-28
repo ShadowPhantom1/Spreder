@@ -1,4 +1,7 @@
 const base = ''
+let memToken: string | null = null
+try{ memToken = localStorage.getItem('token') }catch{}
+export function setToken(t:string|null){ memToken=t; try{ if(t) localStorage.setItem('token', t); else localStorage.removeItem('token') }catch{} }
 function getDeviceId(){
   try{
     let id=localStorage.getItem('device_id')
@@ -8,9 +11,9 @@ function getDeviceId(){
 }
 function authHeader(): Record<string,string> {
   try {
-    const t = localStorage.getItem('token')
     const d = getDeviceId()
     const h:any = d ? { 'x-device-id': d } : {}
+    const t = memToken || (()=>{ try{ return localStorage.getItem('token')}catch{ return null}})()
     if(t) h['Authorization']=`Bearer ${t}`
     return h
   } catch { return {} }
@@ -27,14 +30,14 @@ async function req(path: string, opts: RequestInit = {}) {
     if(res.status===401){
       const isAuthRoute = path.includes('/api/auth/login') || path.includes('/api/auth/me')
       if(!isAuthRoute){
-        try{ localStorage.removeItem('token') }catch{}
+        setToken(null)
         const loc = typeof window!=='undefined' ? window.location.pathname : ''
         if(!loc.includes('/login') && !loc.includes('/super')){
-          if(loc.includes('/admin') || msg.includes('Super')) window.location.href='/super'
-          else window.location.href='/login'
+          // use replace to avoid history bloat (silly: href full reload -> replace)
+          if(loc.includes('/admin') || msg.includes('Super')) window.location.replace('/super')
+          else window.location.replace('/login')
         }
       }
-      // make message friendly
       if(msg.includes('web snapped')||msg.includes('Invalid token')) throw new Error('Session expired — please login again.')
       if(msg.includes('thwip')) throw new Error('Login required — please sign in.')
     }

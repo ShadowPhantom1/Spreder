@@ -3,20 +3,10 @@ import { randomUUID } from 'crypto'
 import { Firebase, Device } from '../db/index.js'
 import { authRequired } from '../middleware/auth.js'
 import * as firebaseService from '../services/firebaseService.js'
+import { normalizeUrl } from '../utils/normalizeUrl.js'
 
 const router = Router()
 router.use(authRequired as any)
-
-function normalizeUrl(u: string): string {
-  try {
-    const url = new URL(u.trim())
-    let host = url.host.toLowerCase()
-    let path = url.pathname.replace(/\/+$/, '').replace(/\.json$/i,'')
-    path = path.replace(/\/(devices|queue|clients|hives).*$/i,'')
-    if(path==='/') path=''
-    return `${url.protocol}//${host}${path}`.toLowerCase()
-  } catch { return u.trim().toLowerCase().replace(/\/+$/,'').replace(/\.json$/i,'') }
-}
 
 function isSuper(req:any){ return req.user?.is_super===1 }
 function ownerFilterFb(req:any){ if(isSuper(req)) return {}; return {owner_id: req.user.id} }

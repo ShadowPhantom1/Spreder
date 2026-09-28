@@ -1,70 +1,42 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { db, useMongo, Session } from '../db/index.js'
+import { Session } from '../db/index.js'
 import { config } from '../config/index.js'
 import mongoose from 'mongoose'
 
 const router = Router()
 
 async function getUserByUsername(username:string){
-  if(useMongo){
-    const User=mongoose.model('User')
-    const d=await User.findOne({username}).lean() as any
-    if(d) return {...d, id:d._id}
-    return null
-  }
-  return db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any
+  const User=mongoose.model('User')
+  const d=await User.findOne({username}).lean() as any
+  if(d) return {...d, id:d._id}
+  return null
 }
 async function getUserById(id:string){
-  if(useMongo){
-    const User=mongoose.model('User')
-    const d=await User.findOne({_id:id}).lean() as any
-    if(d) return {...d, id:d._id}
-    return null
-  }
-  return db.prepare('SELECT * FROM users WHERE id=?').get(id) as any
-}
-async function updateUserLock(id:string, ip:string, deviceId:string){
-  if(useMongo){
-    const User=mongoose.model('User')
-    await User.updateOne({_id:id}, {$set:{allowed_device:deviceId}, $unset:{allowed_ip:""}} as any)
-  } else {
-    // SQLite: keep column for compat but null it (fully Mongo now, SQLite is in-memory dummy)
-    try{ db.prepare('UPDATE users SET allowed_device=? , allowed_ip=NULL WHERE id=?').run(deviceId, id) }catch{}
-  }
+  const User=mongoose.model('User')
+  const d=await User.findOne({_id:id}).lean() as any
+  if(d) return {...d, id:d._id}
+  return null
 }
 
 router.post('/login', async (req, res) => {
-  const t0 = Date.now()
   try{
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'username & password required' })
-  const t1 = Date.now()
   const user = await getUserByUsername(username) as any
-  const tFind = Date.now()-t1
   if (!user) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
   if(user.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
   if(user.expires_at && new Date(user.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || ''
-  const deviceId = (req.headers['x-device-id'] as string) || req.headers['user-agent']?.slice(0,80) || 'web'
-  // verify password FIRST (fast fail, don't lock device on wrong pass)
-  const tB0 = Date.now()
   const ok = await bcrypt.compare(password, user.password_hash)
-  const tB = Date.now()-tB0
   if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
-  // DEVICE LOCK REMOVED — fully isolated tenant, kahi se bhi login, har user ka alg data
-  // old allowed_device block deleted. Session token (single device) already ensures 1 ID 1 active: new login overwrites old token.
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
-  // respond first, sessions async (fire-and-forget) for speed
-  res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
+  res.cookie('token', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV==='production', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, is_super: user.is_super } })
-  // async session update — don't block response
-  Session.deleteOne({_id: user.id} as any).catch(()=>{})
-  Session.deleteOne({user_id: user.id} as any).catch(()=>{})
-  Session.create({_id: user.id, user_id: user.id, ip, device_id: deviceId, token, last_active: new Date().toISOString()} as any).catch(()=>{})
-  try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id); db.prepare('INSERT INTO sessions (user_id, ip, device_id, token, last_active) VALUES (?,?,?,?,?)').run(user.id, ip, deviceId, token, new Date().toISOString()) }catch{}
-  }catch(e:any){ console.error('[login] err',e); res.status(500).json({error:e.message})}
+  await Session.deleteOne({_id: user.id} as any).catch(()=>{})
+  await Session.deleteOne({user_id: user.id} as any).catch(()=>{})
+  await Session.create({_id: user.id, user_id: user.id, ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '', device_id: (req.headers['x-device-id'] as string) || 'web', token, last_active: new Date().toISOString()} as any).catch(()=>{})
+  }catch(e:any){ res.status(500).json({error:e.message})}
 })
 
 router.post('/logout', async (req:any, res) => {
@@ -72,8 +44,8 @@ router.post('/logout', async (req:any, res) => {
     const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
     if(token){
       const p:any = jwt.verify(token, config.JWT_SECRET)
-      try{ await Session.deleteOne({_id: p.id} as any); await Session.deleteOne({user_id: p.id} as any) }catch{}
-      try{ db.prepare('DELETE FROM sessions WHERE user_id=?').run(p.id) }catch{}
+      await Session.deleteOne({_id: p.id} as any).catch(()=>{})
+      await Session.deleteOne({user_id: p.id} as any).catch(()=>{})
     }
   }catch{}
   res.clearCookie('token', { path: '/' })
@@ -81,7 +53,7 @@ router.post('/logout', async (req:any, res) => {
 })
 
 router.get('/me', async (req: any, res) => {
-  const raw = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : req.headers.authorization?.slice(7))
+  const raw = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null)
   const token = raw as string
   if (!token) return res.status(401).json({ error: 'No token' })
   try {

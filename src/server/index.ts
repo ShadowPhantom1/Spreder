@@ -17,17 +17,17 @@ import adminRoutes from './routes/admin.js'
 import * as devicePoller from './services/devicePoller.js'
 import * as queueService from './services/queueService.js'
 import * as deviceValidator from './services/deviceValidator.js'
-import { db } from './db/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
 const httpServer = createServer(app)
-const io = new IOServer(httpServer, { cors: { origin: true, credentials: true } })
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s=>s.trim()).filter(Boolean)
+const io = new IOServer(httpServer, { cors: { origin: allowedOrigins.length? allowedOrigins : true, credentials: true } })
 
-// middleware
-app.use(cors({ origin: true, credentials: true }))
+// middleware — CORS whitelist (silly: origin:true allow-all fixed)
+app.use(cors({ origin: allowedOrigins.length? allowedOrigins : true, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: true }))
@@ -209,7 +209,7 @@ httpServer.listen(config.PORT, config.HOST, async () => {
   console.log(`   ███████╗██████╗ ██╗██████╗ ███████╗██████╗ `)
   console.log(`   Server running at http://${config.HOST}:${config.PORT}`)
   console.log(`   Env: ${config.NODE_ENV} | DB: MongoDB (fully)`)
-  console.log(`   Admin: ${config.ADMIN_USER} / ${config.ADMIN_PASS}\n`)
+  console.log(`   Admin: ${config.ADMIN_USER} / ***\n`)
   devicePoller.start()
   deviceValidator.startValidator()
 

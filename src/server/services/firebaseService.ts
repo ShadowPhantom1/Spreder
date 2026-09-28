@@ -5,20 +5,7 @@ import { setTimeout as delay } from 'timers/promises'
 
 export type FirebaseConfigRow = { id: string; name: string; database_url: string; service_account_json?: string }
 export type DevicePollResult = { id: string; name: string; model?: string; status: 'online'|'offline'|'busy'; battery?: number; signal?: number; last_seen?: string }
-
-function normalizeUrl(url: string) {
-  // strip trailing .json and slashes + lower-case host (matches firebases.ts)
-  try{
-    const u=new URL(url.trim())
-    let host=u.host.toLowerCase()
-    let path=u.pathname.replace(/\/+$/, '').replace(/\.json$/i,'')
-    path=path.replace(/\/(devices|queue|clients|hives).*$/i,'')
-    if(path==='/') path=''
-    return `${u.protocol}//${host}${path}`.toLowerCase()
-  }catch{
-    return url.trim().toLowerCase().replace(/\/+$/, '').replace(/\.json$/i,'')
-  }
-}
+import { normalizeUrl } from '../utils/normalizeUrl.js'
 function isMock(base: string) {
   return base.includes('mock') || base.includes('demo') || base.includes('bhnstock') || base.includes('example')
 }
