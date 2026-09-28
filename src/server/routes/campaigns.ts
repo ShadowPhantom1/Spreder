@@ -6,6 +6,17 @@ import * as queueService from '../services/queueService.js'
 const router = Router()
 router.use(authRequired as any)
 
+function isSuper(req:any){ return req.user?.is_super===1 }
+function ownerFilter(req:any){
+  // super sees all, user sees own only
+  if(isSuper(req)) return {}
+  return {owner_id: req.user.id}
+}
+function assertOwner(doc:any, req:any){
+  if(isSuper(req)) return true
+  return doc && doc.owner_id === req.user.id
+}
+
 function generateSimplePdf(campaign:any, messages:any[]): Buffer {
   const lines: string[] = []
   lines.push(`Campaign: ${campaign.name} (${campaign.id || campaign._id})`)
@@ -37,12 +48,13 @@ function generateSimplePdf(campaign:any, messages:any[]): Buffer {
   return Buffer.from(pdf)
 }
 
-router.get('/', async (_req, res) => {
-  const rows = await Campaign.find().sort({created_at:-1}).lean() as any[]
+router.get('/', async (req:any, res) => {
+  const filter=ownerFilter(req)
+  const rows = await Campaign.find(filter).sort({created_at:-1}).limit(200).lean() as any[]
   res.json(rows.map((r:any)=> ({...r, id:r._id})))
 })
 
-router.post('/', async (req, res) => {
+router.post('/', async (req:any, res) => {
   const { name, template, contacts, contactsText, batch_size, delay_ms } = req.body || {}
   if (!name || !template) return res.status(400).json({ error: 'name & template required' })
 
@@ -92,7 +104,7 @@ router.post('/', async (req, res) => {
   if (contactList.length === 0) return res.status(400).json({ error: 'At least one contact required — phone numbers se web banao!' })
 
   try {
-    const result = await queueService.createCampaign({ name, template, contacts: contactList, batch_size, delay_ms })
+    const result = await queueService.createCampaign({ name, template, contacts: contactList, batch_size, delay_ms, owner_id: req.user.id } as any)
     const campaign = await Campaign.findOne({_id:result.id}).lean() as any
     res.status(201).json({ campaign: {...campaign, id:campaign._id}, ...result })
   } catch (e: any) {
@@ -100,24 +112,29 @@ router.post('/', async (req, res) => {
   }
 })
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req:any, res) => {
   const row = await Campaign.findOne({_id:req.params.id}).lean() as any
   if (!row) return res.status(404).json({ error: 'Not found' })
+  if(!assertOwner(row, req)) return res.status(403).json({ error: 'Not yours' })
   res.json({...row, id:row._id})
 })
 
-router.get('/:id/messages', async (req, res) => {
+router.get('/:id/messages', async (req:any, res) => {
+  const campaign = await Campaign.findOne({_id:req.params.id}).lean() as any
+  if(!campaign) return res.status(404).json({ error: 'Not found' })
+  if(!assertOwner(campaign, req)) return res.status(403).json({ error: 'Not yours' })
   const { status, limit = 100, offset = 0 } = req.query as any
   const filter:any={campaign_id:req.params.id}
   if (status) filter.status=status
-  const rows = await CampaignMessage.find(filter).sort({sent_at:-1, created_at:-1}).limit(Number(limit)).skip(Number(offset)).lean() as any[]
+  const rows = await CampaignMessage.find(filter).sort({sent_at:-1, created_at:-1}).limit(Math.min(500, Number(limit))).skip(Number(offset)).lean() as any[]
   const total = await CampaignMessage.countDocuments({campaign_id:req.params.id})
   res.json({ messages: rows.map((r:any)=> ({...r, id:r._id})), total })
 })
 
-router.get('/:id/export', async (req, res)=>{
+router.get('/:id/export', async (req:any, res)=>{
   const campaign = await Campaign.findOne({_id:req.params.id}).lean() as any
   if(!campaign) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(campaign, req)) return res.status(403).json({ error: 'Not yours' })
   const format = ((req.query.format as string)||'csv').toLowerCase()
   const messages = await CampaignMessage.find({campaign_id:req.params.id}).sort({sent_at:1, created_at:1}).lean() as any[]
   if(format==='csv'){
@@ -140,9 +157,10 @@ router.get('/:id/export', async (req, res)=>{
   } else return res.status(400).json({ error:'format must be csv or pdf' })
 })
 
-router.post('/:id/notify-webhook', async (req,res)=>{
+router.post('/:id/notify-webhook', async (req:any,res)=>{
   const campaign = await Campaign.findOne({_id:req.params.id}).lean() as any
   if(!campaign) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(campaign, req)) return res.status(403).json({ error: 'Not yours' })
   const webhookUrlDoc = await Setting.findOne({_id:'webhook_url'}).lean() as any
   const enabledDoc = await Setting.findOne({_id:'webhook_enabled'}).lean() as any
   const url = webhookUrlDoc?.value
@@ -158,38 +176,56 @@ router.post('/:id/notify-webhook', async (req,res)=>{
   }catch(e:any){ res.status(500).json({ error: e.message })}
 })
 
-router.post('/bulk-delete', async (req, res)=>{
+router.post('/bulk-delete', async (req:any, res)=>{
   const { ids } = req.body || {}
   if(!Array.isArray(ids)) return res.status(400).json({ error:'ids array required' })
-  const r=await Campaign.deleteMany({_id:{$in:ids}})
-  // cascade — prevent orphan queue/messages that jam dispatch (deep fix for user report)
-  await CampaignMessage.deleteMany({campaign_id:{$in:ids}})
-  await QueueItem.deleteMany({campaign_id:{$in:ids}})
+  const filter:any={_id:{$in:ids}}
+  if(!isSuper(req)) filter.owner_id=req.user.id
+  const owned = await Campaign.find(filter).lean() as any[]
+  const ownedIds = owned.map((c:any)=> c._id)
+  if(ownedIds.length===0) return res.json({ deleted: 0 })
+  const r=await Campaign.deleteMany({_id:{$in:ownedIds}})
+  await CampaignMessage.deleteMany({campaign_id:{$in:ownedIds}})
+  await QueueItem.deleteMany({campaign_id:{$in:ownedIds}})
   res.json({ deleted: r.deletedCount })
 })
 
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', async (req:any, res) => {
+  const c = await Campaign.findOne({_id:req.params.id}).lean() as any
+  if(!c) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(c, req)) return res.status(403).json({ error: 'Not yours' })
   const r = await queueService.startCampaign(req.params.id)
   if (!r.ok) return res.status(400).json(r)
   res.json({ ok: true, message: 'Campaign launched — thwip! 🕸️' })
 })
-router.post('/:id/pause', async (req, res) => {
-  const c = await queueService.pauseCampaign(req.params.id)
-  res.json(c)
+router.post('/:id/pause', async (req:any, res) => {
+  const c = await Campaign.findOne({_id:req.params.id}).lean() as any
+  if(!c) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(c, req)) return res.status(403).json({ error: 'Not yours' })
+  const out = await queueService.pauseCampaign(req.params.id)
+  res.json(out)
 })
-router.post('/:id/resume', async (req, res) => {
+router.post('/:id/resume', async (req:any, res) => {
+  const c = await Campaign.findOne({_id:req.params.id}).lean() as any
+  if(!c) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(c, req)) return res.status(403).json({ error: 'Not yours' })
   const r = await queueService.resumeCampaign(req.params.id)
   if (!r.ok) return res.status(400).json(r)
   res.json({ ok: true })
 })
-router.post('/:id/cancel', async (req, res) => {
-  const c = await queueService.cancelCampaign(req.params.id)
-  res.json(c)
+router.post('/:id/cancel', async (req:any, res) => {
+  const c = await Campaign.findOne({_id:req.params.id}).lean() as any
+  if(!c) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(c, req)) return res.status(403).json({ error: 'Not yours' })
+  const out = await queueService.cancelCampaign(req.params.id)
+  res.json(out)
 })
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req:any, res) => {
   const id=req.params.id
+  const c = await Campaign.findOne({_id:id}).lean() as any
+  if(!c) return res.status(404).json({ error:'Not found' })
+  if(!assertOwner(c, req)) return res.status(403).json({ error: 'Not yours' })
   await Campaign.deleteOne({_id:id})
-  // cascade — deep fix: delete orphan messages/queue so next shoot not jammed
   await CampaignMessage.deleteMany({campaign_id:id})
   await QueueItem.deleteMany({campaign_id:id})
   res.json({ ok: true })

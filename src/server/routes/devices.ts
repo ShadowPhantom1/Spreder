@@ -5,9 +5,12 @@ import { authRequired } from '../middleware/auth.js'
 const router = Router()
 router.use(authRequired as any)
 
-router.get('/', async (req, res) => {
+function isSuper(req:any){ return req.user?.is_super===1 }
+
+router.get('/', async (req:any, res) => {
   const { firebase_id, status, q } = req.query as any
   const filter:any={}
+  if(!isSuper(req)) filter.owner_id=req.user.id
   if (firebase_id) filter.firebase_id = firebase_id
   if (status) filter.status = status
   if (q) filter.$or=[{name:{$regex:q, $options:'i'}}, {model:{$regex:q, $options:'i'}}]
@@ -23,17 +26,19 @@ router.get('/', async (req, res) => {
   res.json(enriched)
 })
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req:any, res) => {
   const row = await Device.findOne({_id:req.params.id}).lean() as any
   if (!row) return res.status(404).json({ error: 'Device not found' })
+  if(!isSuper(req) && row.owner_id!==req.user.id) return res.status(403).json({ error:'Not yours' })
   const fb=await Firebase.findOne({_id:row.firebase_id}).lean() as any
   res.json({...row, id:row._id, firebase_name: fb?.name})
 })
 
-router.put('/:id', async (req, res)=>{
+router.put('/:id', async (req:any, res)=>{
   const { sim_count, has_recharge, sim1_recharge, sim2_recharge } = req.body || {}
   const existing = await Device.findOne({_id:req.params.id}).lean() as any
   if(!existing) return res.status(404).json({ error:'Not found' })
+  if(!isSuper(req) && existing.owner_id!==req.user.id) return res.status(403).json({ error:'Not yours' })
   const sc = sim_count!==undefined ? parseInt(sim_count,10) : existing.sim_count
   const hr = has_recharge!==undefined ? (has_recharge?1:0) : existing.has_recharge
   const s1 = sim1_recharge!==undefined ? (sim1_recharge?1:0) : (existing.sim1_recharge ?? 1)
@@ -43,11 +48,13 @@ router.put('/:id', async (req, res)=>{
   res.json({...updated, id:(updated as any)._id})
 })
 
-router.put('/bulk/recharge', async (req,res)=>{
+router.put('/bulk/recharge', async (req:any,res)=>{
   const { ids, has_recharge } = req.body || {}
   if(!Array.isArray(ids)) return res.status(400).json({ error:'ids array' })
   const v = has_recharge?1:0
-  await Device.updateMany({_id:{$in:ids}}, {$set:{has_recharge:v}})
+  const filter:any={_id:{$in:ids}}
+  if(!isSuper(req)) filter.owner_id=req.user.id
+  await Device.updateMany(filter, {$set:{has_recharge:v}})
   res.json({ updated: ids.length, has_recharge: v })
 })
 

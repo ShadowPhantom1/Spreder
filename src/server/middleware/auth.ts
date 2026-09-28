@@ -36,11 +36,8 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     if(!u) return res.status(401).json({ error: 'User not found' })
     if(u.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
     if(u.expires_at && new Date(u.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
-    const devId = (req.headers['x-device-id'] as string) || req.headers['user-agent']?.slice(0,80) || ''
-    // IP system removed — kahi se bhi login, sirf device lock
-    if(u.allowed_device && u.allowed_device!=='*' && u.allowed_device!==''){
-      if(devId !== u.allowed_device) return res.status(403).json({ error: 'Device not allowed — first device only' })
-    }
+    // FULLY ISOLATED TENANT: device lock removed — kahi se bhi login, IP free, har user ka alg data
+    // old allowed_device check removed (was blocking 2nd device with 403). Single session via Session.token already handles 1 ID 1 device: new login overwrites token and kicks old.
     // FULLY MONGO sessions — cached 10s to avoid DB hit on every poll (firebases 7s)
     const sessCache = _sessCache.get(cacheKey)
     if(!sessCache || Date.now() > sessCache.exp){

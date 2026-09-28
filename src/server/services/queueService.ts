@@ -13,7 +13,7 @@ const running = new Map<string, { cancelled: boolean; paused: boolean }>()
 
 // ===== FIX: cache settings & device today counts =====
 let _deviceTodayCache = new Map<string,{count:number, ts:number}>()
-let _deviceCache: {ts:number, devices:any[]} | null = null
+let _deviceCacheMap = new Map<string,{ts:number, devices:any[]}>()
 
 function renderTemplate(template: string, vars: Record<string, string>, phone: string) {
   let out = template
@@ -82,6 +82,7 @@ export async function createCampaign(data: {
   batch_size?: number
   delay_ms?: number
   firebaseIds?: string[]
+  owner_id?: string
 }) {
   const id = `cmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`
   const now = new Date().toISOString()
@@ -110,15 +111,16 @@ export async function createCampaign(data: {
   const batch = data.batch_size || defBatch
   const dly = data.delay_ms || defDelay
 
-  await Campaign.create({_id:id, id, name:data.name, template:data.template, status:'draft', total:clean.length, sent:0, failed:0, pending:clean.length, batch_size: batch, delay_ms: dly, created_at: now, started_at:null, finished_at:null})
+  const owner = (data as any).owner_id || null
+  await Campaign.create({_id:id, id, name:data.name, template:data.template, status:'draft', total:clean.length, sent:0, failed:0, pending:clean.length, batch_size: batch, delay_ms: dly, created_at: now, started_at:null, finished_at:null, owner_id: owner})
 
   const msgDocs:any[]=[]
   const queueDocs:any[]=[]
   for (const c of clean) {
     const mid = `msg_${Math.random().toString(36).slice(2,9)}${Date.now().toString(36).slice(-4)}`
     const rendered = renderTemplate(data.template, c.vars, c.phone)
-    msgDocs.push({_id:mid, id:mid, campaign_id:id, phone:c.phone, variables:JSON.stringify(c.vars), rendered, status:'pending', device_id:null, firebase_id:null, attempts:0, last_error:null, sent_at:null, created_at:now})
-    queueDocs.push({_id:`q_${mid}`, id:`q_${mid}`, campaign_id:id, message_id:mid, status:'queued', priority:0, created_at:now})
+    msgDocs.push({_id:mid, id:mid, campaign_id:id, phone:c.phone, variables:JSON.stringify(c.vars), rendered, status:'pending', device_id:null, firebase_id:null, attempts:0, last_error:null, sent_at:null, created_at:now, owner_id: owner})
+    queueDocs.push({_id:`q_${mid}`, id:`q_${mid}`, campaign_id:id, message_id:mid, status:'queued', priority:0, created_at:now, owner_id: owner})
   }
   if(msgDocs.length) await CampaignMessage.insertMany(msgDocs, {ordered:false})
   if(queueDocs.length) await QueueItem.insertMany(queueDocs, {ordered:false})
@@ -133,19 +135,18 @@ export async function getCampaign(id: string) {
   return null
 }
 
-async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: string; name: string; status: string; slot: number; slotKey?:string; sim_count?:number; has_recharge?:number; sim1_recharge?:number; sim2_recharge?:number; last_seen?:string; total_sent?:number; total_failed?:number; validated_score?:number; validator_fail_count?:number }>> {
-  // FIX: cache 3s — was fetching + 166 countDocuments every batch (every ~5s) hammering DB
-  if(_deviceCache && Date.now()-_deviceCache.ts < 3000) {
-    // return copy with fresh round-robin rotation applied outside
-    return _deviceCache.devices
+async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; firebase_id: string; name: string; status: string; slot: number; slotKey?:string; sim_count?:number; has_recharge?:number; sim1_recharge?:number; sim2_recharge?:number; last_seen?:string; total_sent?:number; total_failed?:number; validated_score?:number; validator_fail_count?:number }>> {
+  // FIX: cache 3s per owner — fully isolated tenant, har user ka alg device list
+  const cacheKey = ownerId || '__global__'
+  const cached = _deviceCacheMap.get(cacheKey)
+  if(cached && Date.now()-cached.ts < 3000) {
+    return cached.devices
   }
-  // deep fix: filter stale devices (last_seen >5min ago) — they show online but Firebase not responding → timeouts
-  // FIX: was 3min too strict for synthesized last_seen, now 5min + handles synthesized time
   const staleCutoff = new Date(Date.now() - 5*60*1000).toISOString()
-  let rows = await Device.find({status: {$in:['online','busy']}, last_seen: {$gte: staleCutoff}}).sort({last_seen:-1}).lean() as any[]
+  const baseOwnerFilter:any = ownerId ? {owner_id: ownerId} : {}
+  let rows = await Device.find({status: {$in:['online','busy']}, last_seen: {$gte: staleCutoff}, ...baseOwnerFilter}).sort({last_seen:-1}).lean() as any[]
   if(rows.length===0){
-    // fallback: if none within 5min, take any online (avoid empty) — but limit 100
-    rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).limit(100).lean() as any[]
+    rows = await Device.find({status: {$in:['online','busy']}, ...baseOwnerFilter}).sort({last_seen:-1}).limit(100).lean() as any[]
   }
   rows = rows.map((r:any)=> ({...r, id:r._id}))
   const byHive = new Map<string, any[]>()
@@ -235,7 +236,9 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
   }
   rows = perSlotRows
   if (rows.length === 0) {
-    let r2 = await Device.find({status:'busy'}).sort({last_seen:-1}).limit(5).lean() as any[]
+    let busyFilter:any={status:'busy'}
+    if(ownerId) busyFilter.owner_id=ownerId
+    let r2 = await Device.find(busyFilter).sort({last_seen:-1}).limit(5).lean() as any[]
     r2=r2.map((r:any)=>({...r, id:r._id}))
     if(checkRecharge) r2=r2.filter(d=> { if(d.has_recharge===0) return false; if(d.sim_count===2 && d.sim1_recharge===0 && d.sim2_recharge===0) return false; return true })
     if(isDailyLimitEnabled()){
@@ -246,13 +249,15 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
     const exp:any[]=[]
     for(const d of r2){ const sc=d.sim_count||1; if(sc===2){ if(d.sim1_recharge!==0) exp.push({...d, slot:1}); if(d.sim2_recharge!==0) exp.push({...d, slot:2}); } else exp.push({...d, slot:1}); }
     if(exp.length>0) {
-      _deviceCache={ts:Date.now(), devices:exp}
+      _deviceCacheMap.set(cacheKey,{ts:Date.now(), devices:exp})
       return exp
     }
     rows=r2
   }
   if (rows.length === 0) {
-    let fallback = await Device.find({status:'online'}).limit(5).lean() as any[]
+    let fbFallbackFilter:any={status:'online'}
+    if(ownerId) fbFallbackFilter.owner_id=ownerId
+    let fallback = await Device.find(fbFallbackFilter).limit(5).lean() as any[]
     fallback=fallback.map((r:any)=>({...r, id:r._id}))
     if(checkRecharge) fallback=fallback.filter(d=> { if(d.has_recharge===0) return false; if(d.sim_count===2 && d.sim1_recharge===0 && d.sim2_recharge===0) return false; return true })
     if(isDailyLimitEnabled()){
@@ -263,12 +268,12 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
     const exp:any[]=[]
     for(const d of fallback){ const sc=d.sim_count||1; if(sc===2){ if(d.sim1_recharge!==0) exp.push({...d, slot:1}); if(d.sim2_recharge!==0) exp.push({...d, slot:2}); } else exp.push({...d, slot:1}); }
     if(exp.length>0) {
-      _deviceCache={ts:Date.now(), devices:exp}
+      _deviceCacheMap.set(cacheKey,{ts:Date.now(), devices:exp})
       return exp
     }
     return []
   }
-  _deviceCache={ts:Date.now(), devices:rows}
+  _deviceCacheMap.set(cacheKey,{ts:Date.now(), devices:rows})
   return rows
 }
 
@@ -331,8 +336,10 @@ export async function processCampaign(campaignId: string) {
     console.log(`[Queue] found ${flat.length} pending for ${campaignId}`)
     if (flat.length === 0) break
     console.log(`[Queue] fetching devices for ${campaignId}`)
-    const devices = await getOnlineDevices()
-    console.log(`[Queue] devices ${devices.length} for ${campaignId}`)
+    // MULTI-TENANCY: har user ke apne devices — campaign owner ke hisab se filter
+    const ownerForDevices = campaign.owner_id || null
+    const devices = await getOnlineDevices(ownerForDevices)
+    console.log(`[Queue] devices ${devices.length} for ${campaignId} owner ${String(ownerForDevices||'global').slice(0,8)}`)
     if (devices.length === 0) {
       emit('campaign:log', { campaignId, level: 'warn', msg: 'No online devices — retrying in 3s… 🕸️' })
       await new Promise(r => setTimeout(r, 3000))
@@ -423,8 +430,8 @@ export async function processCampaign(campaignId: string) {
     roundRobinIdx = batchRRStart + flat.length
     // persist every batch (not every message)
     try{ await Setting.updateOne({_id:'global_rr'}, {$set:{key:'global_rr', value:String(roundRobinIdx), updated_at:new Date().toISOString()}}, {upsert:true}) }catch{}
-    // clear device cache for next batch to allow rotation
-    _deviceCache=null
+    // clear device cache per owner for next batch
+    _deviceCacheMap.delete(campaign.owner_id || '__global__')
 
     const updated:any = await getCampaign(campaignId)
     emit('campaign:progress', { campaignId, sent: updated.sent, failed: updated.failed, pending: updated.pending, total: updated.total })

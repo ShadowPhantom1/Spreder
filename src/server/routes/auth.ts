@@ -53,18 +53,8 @@ router.post('/login', async (req, res) => {
   const ok = await bcrypt.compare(password, user.password_hash)
   const tB = Date.now()-tB0
   if (!ok) return res.status(401).json({ error: 'Invalid credentials — wrong web!' })
-  // device binding check AFTER password success — IP system removed
-  if(!user.allowed_device || user.allowed_device===''){
-    if(user.is_super!==1){
-      // fire-and-forget lock to not block response, but also await with timeout 800ms
-      try{ await Promise.race([updateUserLock(user.id, ip, deviceId), new Promise((_,rej)=>setTimeout(()=>rej(new Error('lock timeout')),800))]); }catch{}
-      console.log(`[Auth] First login device lock ${user.username} → Device ${deviceId.slice(0,20)} (${Date.now()-t0}ms find:${tFind}ms bcrypt:${tB}ms)`)
-    }
-  } else {
-    if(user.allowed_device && user.allowed_device!=='*' && user.allowed_device!==''){
-      if(deviceId !== user.allowed_device) return res.status(403).json({ error: `Device not allowed` })
-    }
-  }
+  // DEVICE LOCK REMOVED — fully isolated tenant, kahi se bhi login, har user ka alg data
+  // old allowed_device block deleted. Session token (single device) already ensures 1 ID 1 active: new login overwrites old token.
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, is_super: user.is_super }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRY } as any)
   // respond first, sessions async (fire-and-forget) for speed
   res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/' })

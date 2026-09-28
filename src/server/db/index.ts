@@ -84,6 +84,23 @@ for(const [k,v] of Object.entries(defaults)){
   const exists=await Setting.findOne({_id:k}).lean()
   if(!exists) await Setting.create({_id:k, key:k, value:v, updated_at:new Date().toISOString()})
 }
+// MULTI-TENANCY MIGRATION: ensure every doc has owner_id (fully isolated per user)
+// existing data (pre-tenant) belongs to super admin
+try{
+  const superAdmin = await User.findOne({is_super:1}).lean() as any
+  if(superAdmin){
+    const owner = superAdmin._id
+    const mig = async (model:any, label:string)=>{
+      const r = await model.updateMany({$or:[{owner_id:{$exists:false}},{owner_id:null},{owner_id:''}]}, {$set:{owner_id:owner}})
+      if((r as any).modifiedCount) console.log(`[DB] migration ${label} -> owner ${String(owner).slice(0,8)} x${(r as any).modifiedCount}`)
+    }
+    await mig(Firebase, 'firebases')
+    await mig(Device, 'devices')
+    await mig(Campaign, 'campaigns')
+    await mig(CampaignMessage, 'campaign_messages')
+    await mig(QueueItem, 'queue_items')
+  }
+}catch(e:any){ console.log('[DB] tenant migration skip', e.message) }
 
 let settingsCache: Record<string,string> = {}
 async function loadCache(){

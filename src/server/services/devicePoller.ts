@@ -48,15 +48,15 @@ async function pollAll() {
           const now = new Date().toISOString()
           const defaultSim = parseInt(getSetting('default_sim_count')||'1',10) || 1
           if (devices.length>0) {
-            // bulk upsert — no per-device findOne (was N+1 query hammering Atlas)
+            const fbOwner = (fb as any).owner_id || null
             const ops = devices.map((d:any)=>{
               if(d.status==='busy' && !d.name.includes('pending')) d.status='online'
               return {
                 updateOne: {
                   filter: {_id: d.id},
                   update: {
-                    $set: { id:d.id, firebase_id:fbId, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now },
-                    $setOnInsert: { _id:d.id, created_at: now, sim_count:defaultSim, has_recharge:1, sim1_recharge:1, sim2_recharge:1 }
+                    $set: { id:d.id, firebase_id:fbId, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, owner_id: fbOwner },
+                    $setOnInsert: { _id:d.id, created_at: now, sim_count:defaultSim, has_recharge:1, sim1_recharge:1, sim2_recharge:1, owner_id: fbOwner }
                   },
                   upsert: true
                 }

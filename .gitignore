@@ -5,3 +5,7 @@ data
 .env
 .DS_Store
 *.log
+*.mjs
+*.bak
+.npm/
+uploads/
