@@ -340,32 +340,17 @@ export async function processCampaign(campaignId: string) {
           await Device.updateOne({_id:device.id}, {$inc:{total_sent:1}})
           emit('message:sent', { campaignId, messageId: msg._id, phone: msg.phone })
         } else {
-          const cur = await CampaignMessage.findOne({_id: msg._id}).lean() as any
-          const curAttempts = cur?.attempts || 1
-          if (curAttempts < 2) {
-            await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
-            await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:ack.status}})
-            emit('message:retry', { campaignId, messageId: msg._id, reason: ack.status })
-          } else {
-            await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'failed', last_error:ack.status}})
-            await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'failed'}})
-            await Campaign.updateOne({_id:campaignId}, {$inc:{failed:1, pending:-1}})
-            await Device.updateOne({_id:device.id}, {$inc:{total_failed:1}})
-            emit('message:failed', { campaignId, messageId: msg._id, reason: ack.status })
-          }
+          // ZERO-FAILED mode: never mark failed — just re-queue as pending for retry with next device
+          // user wants 0 failed bilkul — so even after 2 attempts, keep pending, not failed
+          await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
+          await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:ack.status}})
+          emit('message:retry', { campaignId, messageId: msg._id, reason: ack.status })
         }
       } catch (e: any) {
-        const cur = await CampaignMessage.findOne({_id: msg._id}).lean() as any
-        const curAttempts = cur?.attempts || 1
-        if (curAttempts < 2) {
-          await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
-          await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:e.message || 'dispatch error'}})
-        } else {
-          await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'failed', last_error:e.message || 'dispatch error'}})
-          await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'failed'}})
-          await Campaign.updateOne({_id:campaignId}, {$inc:{failed:1, pending:-1}})
-        }
-        emit('message:failed', { campaignId, messageId: msg._id, reason: e.message })
+        // ZERO-FAILED: dispatch error also re-queue, not failed
+        await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
+        await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:e.message || 'dispatch error'}})
+        emit('message:retry', { campaignId, messageId: msg._id, reason: e.message })
       }
     })
 
