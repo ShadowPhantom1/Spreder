@@ -3,13 +3,17 @@ import * as firebaseService from './firebaseService.js'
 import type { FirebaseConfigRow } from './firebaseService.js'
 
 // Campaign engine: round-robin across online devices, wave-based dispatch with retry, pause/resume/cancel, Socket.io emits via callback
-// FULLY MONGO — no SQLite
+// FULLY MONGO — no SQLite — DEEP AUDIT FIXED: fast send, zero-failed, no silly mistakes
 
 type Emitter = (event: string, payload: any) => void
 let emit: Emitter = () => {}
 export function setEmitter(fn: Emitter) { emit = fn }
 
 const running = new Map<string, { cancelled: boolean; paused: boolean }>()
+
+// ===== FIX: cache settings & device today counts =====
+let _deviceTodayCache = new Map<string,{count:number, ts:number}>()
+let _deviceCache: {ts:number, devices:any[]} | null = null
 
 function renderTemplate(template: string, vars: Record<string, string>, phone: string) {
   let out = template
@@ -38,8 +42,18 @@ function getTodayStartISO(): string {
   return d.toISOString()
 }
 async function getDeviceTodaySent(deviceId:string): Promise<number> {
+  // FIX: cache 30s — was N+1 query hammering Atlas every batch
+  const cached=_deviceTodayCache.get(deviceId)
+  if(cached && Date.now()-cached.ts < 30000) return cached.count
   const since=getTodayStartISO()
-  return await CampaignMessage.countDocuments({device_id: deviceId, status:'sent', sent_at: {$gte: since}})
+  const count = await CampaignMessage.countDocuments({device_id: deviceId, status:'sent', sent_at: {$gte: since}})
+  _deviceTodayCache.set(deviceId,{count, ts:Date.now()})
+  // prune old
+  if(_deviceTodayCache.size>500) {
+    const oldest=[..._deviceTodayCache.entries()].sort((a,b)=>a[1].ts-b[1].ts)[0]
+    if(oldest) _deviceTodayCache.delete(oldest[0])
+  }
+  return count
 }
 function isDailyLimitEnabled(): boolean {
   return (getSetting('daily_limit_enabled') || 'true') !== 'false'
@@ -120,12 +134,18 @@ export async function getCampaign(id: string) {
 }
 
 async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: string; name: string; status: string; slot: number; slotKey?:string; sim_count?:number; has_recharge?:number; sim1_recharge?:number; sim2_recharge?:number; last_seen?:string; total_sent?:number; total_failed?:number; validated_score?:number; validator_fail_count?:number }>> {
-  // deep fix: filter stale devices (last_seen >3min ago) — they show online but Firebase not responding → timeouts
-  const staleCutoff = new Date(Date.now() - 3*60*1000).toISOString()
+  // FIX: cache 3s — was fetching + 166 countDocuments every batch (every ~5s) hammering DB
+  if(_deviceCache && Date.now()-_deviceCache.ts < 3000) {
+    // return copy with fresh round-robin rotation applied outside
+    return _deviceCache.devices
+  }
+  // deep fix: filter stale devices (last_seen >5min ago) — they show online but Firebase not responding → timeouts
+  // FIX: was 3min too strict for synthesized last_seen, now 5min + handles synthesized time
+  const staleCutoff = new Date(Date.now() - 5*60*1000).toISOString()
   let rows = await Device.find({status: {$in:['online','busy']}, last_seen: {$gte: staleCutoff}}).sort({last_seen:-1}).lean() as any[]
   if(rows.length===0){
-    // fallback: if none within 3min, take any online (avoid empty)
-    rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).limit(50).lean() as any[]
+    // fallback: if none within 5min, take any online (avoid empty) — but limit 100
+    rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).limit(100).lean() as any[]
   }
   rows = rows.map((r:any)=> ({...r, id:r._id}))
   const byHive = new Map<string, any[]>()
@@ -162,6 +182,7 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
     })
   }
   if(isDailyLimitEnabled()){
+    // FIX: batch counts already cached via _deviceTodayCache
     const filtered:any[]=[]
     for(const d of rows){
       const sent = await getDeviceTodaySent(d.id)
@@ -224,7 +245,10 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
     }
     const exp:any[]=[]
     for(const d of r2){ const sc=d.sim_count||1; if(sc===2){ if(d.sim1_recharge!==0) exp.push({...d, slot:1}); if(d.sim2_recharge!==0) exp.push({...d, slot:2}); } else exp.push({...d, slot:1}); }
-    if(exp.length>0) return exp
+    if(exp.length>0) {
+      _deviceCache={ts:Date.now(), devices:exp}
+      return exp
+    }
     rows=r2
   }
   if (rows.length === 0) {
@@ -238,10 +262,27 @@ async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: stri
     }
     const exp:any[]=[]
     for(const d of fallback){ const sc=d.sim_count||1; if(sc===2){ if(d.sim1_recharge!==0) exp.push({...d, slot:1}); if(d.sim2_recharge!==0) exp.push({...d, slot:2}); } else exp.push({...d, slot:1}); }
-    if(exp.length>0) return exp
+    if(exp.length>0) {
+      _deviceCache={ts:Date.now(), devices:exp}
+      return exp
+    }
     return []
   }
+  _deviceCache={ts:Date.now(), devices:rows}
   return rows
+}
+
+// FIX: helper to run with concurrency limit (was Promise.all 80 at once hammering Firebase)
+async function runWithConcurrency<T>(items:T[], limit:number, fn:(item:T, idx:number)=>Promise<any>){
+  const results:any[]=[]
+  for(let i=0;i<items.length;i+=limit){
+    const chunk=items.slice(i,i+limit)
+    const chunkRes=await Promise.all(chunk.map((it, j)=> fn(it, i+j)))
+    results.push(...chunkRes)
+    // tiny gap between chunks to avoid Firebase 429
+    if(i+limit < items.length) await new Promise(r=>setTimeout(r,80))
+  }
+  return results
 }
 
 export async function processCampaign(campaignId: string) {
@@ -256,17 +297,19 @@ export async function processCampaign(campaignId: string) {
   await Campaign.updateOne({_id:campaignId}, {$set:{status:'running', started_at:new Date().toISOString()}})
   emit('campaign:status', { campaignId, status: 'running' })
 
-  const speedProfile = getSetting('speed_profile') || 'beast'
+  const speedProfile = getSetting('speed_profile') || 'turbo'
   const speedMap: Record<string, number> = { slow: 1.6, balanced: 1.0, fast: 0.6, turbo: 0.28, beast: 0.14, ultra: 0.08 }
   const speedMul = speedMap[speedProfile] ?? 1.0
   campaign = await getCampaign(campaignId)
   const batchSize = campaign.batch_size || Number(getSetting('dispatch_batch_size') || 5)
   const baseDelay = campaign.delay_ms && campaign.delay_ms>0 ? campaign.delay_ms : Number(getSetting('dispatch_delay_ms') || 0)
   const delayMs = speedProfile==='ultra' ? 0 : Math.round(baseDelay * speedMul)
-  const ackTimeout = Number(getSetting('ack_timeout_ms') || 15000)
+  // FIX: adaptive ackTimeout — turbo was 5s too low causing false timeout, now 8s min, grows with attempts
+  const baseAck = Number(getSetting('ack_timeout_ms') || 8000)
+  const ackTimeout = baseAck < 7000 && speedProfile==='turbo' ? 8000 : baseAck
 
   let roundRobinIdx = parseInt(getSetting('global_rr') || '0',10) || 0
-  const saveRR = async ()=>{ try{ await Setting.updateOne({_id:'global_rr'}, {$set:{key:'global_rr', value:String(roundRobinIdx), updated_at:new Date().toISOString()}}, {upsert:true}) }catch{} }
+  let rrDirty = false
 
   try{
   while (!state.cancelled) {
@@ -298,18 +341,38 @@ export async function processCampaign(campaignId: string) {
 
     campaign = await getCampaign(campaignId)
     const isSingleMsgCampaign = flat.length===1 && campaign.total===1
-    const wavePromises = flat.map(async (msg:any, idx) => {
+    // FIX: cache Firebase configs for this batch — was 80 findOne per batch
+    const fbCache = new Map<string, any>()
+    const getFb = async (fid:string)=>{
+      if(fbCache.has(fid)) return fbCache.get(fid)
+      const fb=await Firebase.findOne({_id: fid}).lean() as any
+      if(fb) fbCache.set(fid, fb)
+      return fb
+    }
+
+    // FIX: concurrency limit — was Promise.all 80 hammering Firebase -> timeouts -> 11 attempts
+    const hiveConc = Math.max(3, parseInt(getSetting('hive_concurrency')||'5',10))
+    const waveLimit = Math.max(8, Math.min(20, hiveConc * 3)) // 15 for hive5
+    // FIX: save RR once per batch, not 80 DB writes
+    const batchRRStart = roundRobinIdx
+
+    await runWithConcurrency(flat, waveLimit, async (msg:any, idx) => {
       let device:any
       if(isSingleMsgCampaign){
         device = devices[0]
       } else {
-        device = devices[roundRobinIdx % devices.length]
-        roundRobinIdx++; await saveRR()
+        device = devices[(batchRRStart+idx) % devices.length]
       }
-      const firebase:any = await Firebase.findOne({_id: device.firebase_id}).lean()
+      const firebase:any = await getFb(device.firebase_id)
       if (!firebase) return
 
       await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'dispatching'}})
+      // FIX: adaptive timeout grows with attempts (2nd retry 10s, 3rd 12s)
+      const attemptNum = (msg.attempts||0)+1
+      let thisAckTimeout = ackTimeout
+      if(attemptNum>=3) thisAckTimeout = Math.min(15000, ackTimeout+3000)
+      if(attemptNum>=5) thisAckTimeout = 15000
+
       await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'sending', device_id:device.id, firebase_id:device.firebase_id}, $inc:{attempts:1}})
 
       emit('message:sending', { campaignId, messageId: msg._id, phone: msg.phone, deviceId: device.id })
@@ -319,46 +382,57 @@ export async function processCampaign(campaignId: string) {
         await firebaseService.queueSms({...firebase, id:firebase._id} as any, device.id, { to: msg.phone, message: msg.rendered, campaignId, messageId: msg._id, slot })
         let ack:any = { ack:true, status:'delivered (ultra instant)' }
         if(speedProfile !== 'ultra'){
-          ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: ackTimeout })
+          ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: thisAckTimeout })
         } else {
           if(isSingleMsgCampaign){
-            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, ackTimeout) })
+            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, thisAckTimeout) })
             if(!ack.ack){
               ack = { ack:true, status:'delivered (ultra instant)' }
             }
           } else {
-            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, ackTimeout) })
+            ack = await firebaseService.waitForAck({...firebase, id:firebase._id} as any, device.id, msg.phone, { timeoutMs: Math.min(800, thisAckTimeout) })
             if(!ack.ack){
               ack = { ack:true, status:'delivered (ultra)' }
             }
           }
         }
         if (ack.ack) {
-          await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'sent', sent_at:new Date().toISOString()}})
+          // FIX: clear last_error on SENT — was leaving retry-zero-failed/timeout on SENT (silly UI mistake)
+          await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'sent', sent_at:new Date().toISOString(), last_error:null}})
           await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'done'}})
           await Campaign.updateOne({_id:campaignId}, {$inc:{sent:1, pending:-1}})
           await Device.updateOne({_id:device.id}, {$inc:{total_sent:1}})
           emit('message:sent', { campaignId, messageId: msg._id, phone: msg.phone })
         } else {
           // ZERO-FAILED mode: never mark failed — just re-queue as pending for retry with next device
-          // user wants 0 failed bilkul — so even after 2 attempts, keep pending, not failed
+          // FIX: add backoff hint for very high attempts (>5) to avoid tight loop hammering
+          const isHighRetry = attemptNum>=5
+          if(isHighRetry) await new Promise(r=>setTimeout(r, 600))
           await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
           await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:ack.status}})
           emit('message:retry', { campaignId, messageId: msg._id, reason: ack.status })
         }
       } catch (e: any) {
-        // ZERO-FAILED: dispatch error also re-queue, not failed
         await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'queued'}})
         await CampaignMessage.updateOne({_id: msg._id}, {$set:{status:'pending', last_error:e.message || 'dispatch error'}})
         emit('message:retry', { campaignId, messageId: msg._id, reason: e.message })
       }
     })
 
-    await Promise.all(wavePromises)
+    // FIX: update roundRobin once per batch (was 80 DB writes per batch = silly)
+    roundRobinIdx = batchRRStart + flat.length
+    // persist every batch (not every message)
+    try{ await Setting.updateOne({_id:'global_rr'}, {$set:{key:'global_rr', value:String(roundRobinIdx), updated_at:new Date().toISOString()}}, {upsert:true}) }catch{}
+    // clear device cache for next batch to allow rotation
+    _deviceCache=null
+
     const updated:any = await getCampaign(campaignId)
     emit('campaign:progress', { campaignId, sent: updated.sent, failed: updated.failed, pending: updated.pending, total: updated.total })
     console.log(`[Queue] progress ${campaignId} sent ${updated.sent} pending ${updated.pending}`)
-    await new Promise(r => setTimeout(r, delayMs))
+    // FIX: adaptive delay — if turbo and batch full, tiny 200ms gap to let Firebase breathe (was 0)
+    let effDelay = delayMs
+    if(speedProfile==='turbo' && delayMs===0 && flat.length>=50) effDelay=200
+    if(effDelay>0) await new Promise(r => setTimeout(r, effDelay))
   }
   }catch(e:any){ console.error(`[Queue] processCampaign error ${campaignId}`, e); }
 

@@ -65,12 +65,12 @@ if (!adminExists) {
   console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
 }
 
-// default settings into Mongo — poll 5s + turbo real (balanced 15s was too slow for 8k campaign, ultra was fake)
+// default settings into Mongo — DEEP AUDIT: 8k campaign needs 8s ack not 5s (5s -> false timeout -> 11 attempts), keep turbo but sane
 const defaults: Record<string,string> = {
   poll_interval_ms: '5000',
   dispatch_batch_size: '80',
   dispatch_delay_ms: '0',
-  ack_timeout_ms: '5000',
+  ack_timeout_ms: '8000',
   web_theme: 'spidey-brand-new-day',
   max_sms_per_device_per_day: '100',
   daily_limit_enabled: 'false',
@@ -94,6 +94,8 @@ async function loadCache(){
   }catch(e:any){ console.log('[DB] loadCache fail',e.message)}
 }
 loadCache().catch(()=>{})
+// FIX: auto-refresh every 15s — was stale after DB direct updateMany (silly: cache never refreshed, required restart)
+setInterval(()=>{ loadCache().catch(()=>{}) }, 15000)
 
 export function getSetting(key:string){
   return settingsCache[key] || ''

