@@ -22,8 +22,8 @@ await mongoose.connect(config.MONGODB_URI, {
 useMongo = true
 console.log('[DB] Mongo connected — FULLY Mongo (ALL DATA) | pool 20')
 
-const {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session} = getModels()
-export {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session}
+const {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session, DeviceDailyStat} = getModels()
+export {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session, DeviceDailyStat}
 
 // ensure indexes in background (fast queries)
 Promise.all([
@@ -34,6 +34,7 @@ Promise.all([
   CampaignMessage.syncIndexes().catch(()=>{}),
   QueueItem.syncIndexes().catch(()=>{}),
   Session.syncIndexes().catch(()=>{}),
+  DeviceDailyStat.syncIndexes().catch(()=>{}),
 ]).then(()=> console.log('[DB] indexes synced')).catch(()=>{})
 
 // keep sqlite db as dummy for legacy imports that still reference db.prepare (will throw if used)
@@ -85,7 +86,6 @@ for(const [k,v] of Object.entries(defaults)){
   if(!exists) await Setting.create({_id:k, key:k, value:v, updated_at:new Date().toISOString()})
 }
 // MULTI-TENANCY MIGRATION: ensure every doc has owner_id (fully isolated per user)
-// existing data (pre-tenant) belongs to super admin
 try{
   const superAdmin = await User.findOne({is_super:1}).lean() as any
   if(superAdmin){
@@ -101,6 +101,34 @@ try{
     await mig(QueueItem, 'queue_items')
   }
 }catch(e:any){ console.log('[DB] tenant migration skip', e.message) }
+// DAILY STAT MIGRATION: per-device daily count persist after campaign delete, next day auto 0
+try{
+  const istOffset=5.5*60*60*1000
+  const ist=new Date(Date.now()+istOffset)
+  const today=`${ist.getUTCFullYear()}-${String(ist.getUTCMonth()+1).padStart(2,'0')}-${String(ist.getUTCDate()).padStart(2,'0')}`
+  const existingToday=await DeviceDailyStat.countDocuments({date:today})
+  if(existingToday===0){
+    const since=new Date(); since.setHours(0,0,0,0)
+    const sinceISO=since.toISOString()
+    const agg=await CampaignMessage.aggregate([
+      {$match:{status:'sent', sent_at:{$gte:sinceISO}}},
+      {$group:{_id:{device_id:'$device_id', owner_id:'$owner_id', firebase_id:'$firebase_id'}, count:{$sum:1}}}
+    ]) as any[]
+    for(const r of agg){
+      const deviceId=r._id.device_id
+      if(!deviceId) continue
+      let ownerId=r._id.owner_id
+      if(!ownerId){
+        const dev=await Device.findOne({_id:deviceId}).lean() as any
+        ownerId=dev?.owner_id || (await User.findOne({is_super:1}).lean() as any)?._id
+      }
+      const firebaseId=r._id.firebase_id || null
+      const id=`${deviceId}_${today}`
+      await DeviceDailyStat.updateOne({_id:id}, {$set:{device_id:deviceId, owner_id:ownerId, firebase_id:firebaseId, date:today, updated_at:new Date().toISOString()}, $inc:{count:r.count}}, {upsert:true})
+    }
+    if(agg.length) console.log(`[DB] migrated DeviceDailyStat ${today} x${agg.length} devices from CampaignMessage`)
+  }
+}catch(e:any){ console.log('[DB] daily stat migration skip', e.message) }
 
 let settingsCache: Record<string,string> = {}
 async function loadCache(){

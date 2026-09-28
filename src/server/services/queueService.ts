@@ -1,4 +1,4 @@
-import { getSetting, Campaign, CampaignMessage, QueueItem, Device, Firebase, Setting } from '../db/index.js'
+import { getSetting, Campaign, CampaignMessage, QueueItem, Device, Firebase, Setting, DeviceDailyStat } from '../db/index.js'
 import * as firebaseService from './firebaseService.js'
 import type { FirebaseConfigRow } from './firebaseService.js'
 
@@ -35,6 +35,15 @@ function renderTemplate(template: string, vars: Record<string, string>, phone: s
   return out
 }
 
+function getTodayDateIST(): string {
+  const now=new Date()
+  const istOffset=5.5*60*60*1000
+  const ist=new Date(now.getTime()+istOffset)
+  const y=ist.getUTCFullYear()
+  const m=String(ist.getUTCMonth()+1).padStart(2,'0')
+  const d=String(ist.getUTCDate()).padStart(2,'0')
+  return `${y}-${m}-${d}`
+}
 function getTodayStartISO(): string {
   const h = parseInt(getSetting('today_start_hour') || '0',10)
   const d=new Date()
@@ -42,18 +51,25 @@ function getTodayStartISO(): string {
   return d.toISOString()
 }
 async function getDeviceTodaySent(deviceId:string): Promise<number> {
-  // FIX: cache 30s — was N+1 query hammering Atlas every batch
+  // FIX: use DeviceDailyStat — campaign delete se limit refresh nahi hoga, har device ka roz ka count DB me persist
   const cached=_deviceTodayCache.get(deviceId)
   if(cached && Date.now()-cached.ts < 30000) return cached.count
-  const since=getTodayStartISO()
-  const count = await CampaignMessage.countDocuments({device_id: deviceId, status:'sent', sent_at: {$gte: since}})
+  const today=getTodayDateIST()
+  const doc=await DeviceDailyStat.findOne({device_id:deviceId, date:today}).lean() as any
+  const count=doc?.count || 0
   _deviceTodayCache.set(deviceId,{count, ts:Date.now()})
-  // prune old
   if(_deviceTodayCache.size>500) {
     const oldest=[..._deviceTodayCache.entries()].sort((a,b)=>a[1].ts-b[1].ts)[0]
     if(oldest) _deviceTodayCache.delete(oldest[0])
   }
   return count
+}
+async function incrementDeviceDailySent(deviceId:string, ownerId:string, firebaseId:string){
+  const today=getTodayDateIST()
+  const id=`${deviceId}_${today}`
+  await DeviceDailyStat.updateOne({_id:id}, {$set:{device_id:deviceId, owner_id:ownerId, firebase_id:firebaseId, date:today, updated_at:new Date().toISOString()}, $inc:{count:1}}, {upsert:true})
+  _deviceTodayCache.delete(deviceId)
+  // also update total_sent on device for overall stats
 }
 function isDailyLimitEnabled(): boolean {
   return (getSetting('daily_limit_enabled') || 'true') !== 'false'
@@ -409,6 +425,8 @@ export async function processCampaign(campaignId: string) {
           await QueueItem.updateOne({_id: msg.qid}, {$set:{status:'done'}})
           await Campaign.updateOne({_id:campaignId}, {$inc:{sent:1, pending:-1}})
           await Device.updateOne({_id:device.id}, {$inc:{total_sent:1}})
+          // FIX: persist per-device daily count — campaign delete se limit reset nahi hoga, IST date pe next day auto 0
+          await incrementDeviceDailySent(device.id, (campaign as any).owner_id || (device as any).owner_id, device.firebase_id)
           emit('message:sent', { campaignId, messageId: msg._id, phone: msg.phone })
         } else {
           // ZERO-FAILED mode: never mark failed — just re-queue as pending for retry with next device

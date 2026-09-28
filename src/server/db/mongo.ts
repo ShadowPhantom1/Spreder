@@ -55,6 +55,12 @@ SessionSchema.index({user_id:1}, {background:true})
 SessionSchema.index({token:1}, {background:true})
 SessionSchema.index({last_active:-1}, {background:true})
 
+export const DeviceDailyStatSchema = new mongoose.Schema({_id:String, device_id:String, owner_id:String, firebase_id:String, date:String, count:Number, updated_at:String},{_id:false, collection:'device_daily_stats', strict:false})
+DeviceDailyStatSchema.index({device_id:1, date:1}, {unique:true, background:true})
+DeviceDailyStatSchema.index({owner_id:1, date:1}, {background:true})
+DeviceDailyStatSchema.index({firebase_id:1, date:1}, {background:true})
+DeviceDailyStatSchema.index({date:1}, {background:true})
+
 export function getModels(){
   const User = mongoose.models.User || mongoose.model('User', UserSchema)
   const Firebase = mongoose.models.Firebase || mongoose.model('Firebase', FirebaseSchema)
@@ -64,5 +70,6 @@ export function getModels(){
   const QueueItem = mongoose.models.QueueItem || mongoose.model('QueueItem', QueueItemSchema)
   const Setting = mongoose.models.Setting || mongoose.model('Setting', SettingSchema)
   const Session = mongoose.models.Session || mongoose.model('Session', SessionSchema)
-  return {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session}
+  const DeviceDailyStat = mongoose.models.DeviceDailyStat || mongoose.model('DeviceDailyStat', DeviceDailyStatSchema)
+  return {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session, DeviceDailyStat}
 }
