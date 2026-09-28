@@ -120,7 +120,13 @@ export async function getCampaign(id: string) {
 }
 
 async function getOnlineDevices(): Promise<Array<{ id: string; firebase_id: string; name: string; status: string; slot: number; slotKey?:string; sim_count?:number; has_recharge?:number; sim1_recharge?:number; sim2_recharge?:number; last_seen?:string; total_sent?:number; total_failed?:number; validated_score?:number; validator_fail_count?:number }>> {
-  let rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).lean() as any[]
+  // deep fix: filter stale devices (last_seen >3min ago) — they show online but Firebase not responding → timeouts
+  const staleCutoff = new Date(Date.now() - 3*60*1000).toISOString()
+  let rows = await Device.find({status: {$in:['online','busy']}, last_seen: {$gte: staleCutoff}}).sort({last_seen:-1}).lean() as any[]
+  if(rows.length===0){
+    // fallback: if none within 3min, take any online (avoid empty)
+    rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).limit(50).lean() as any[]
+  }
   rows = rows.map((r:any)=> ({...r, id:r._id}))
   const byHive = new Map<string, any[]>()
   for(const r of rows){ if(!byHive.has(r.firebase_id)) byHive.set(r.firebase_id, []); byHive.get(r.firebase_id)!.push(r) }

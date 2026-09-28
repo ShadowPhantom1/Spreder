@@ -65,17 +65,18 @@ if (!adminExists) {
   console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
 }
 
-// default settings into Mongo — poll 5s (was 500ms hammering Atlas) + balanced real ack (was ultra fake)
+// default settings into Mongo — poll 5s + turbo real (balanced 15s was too slow for 8k campaign, ultra was fake)
 const defaults: Record<string,string> = {
   poll_interval_ms: '5000',
-  dispatch_batch_size: '50',
+  dispatch_batch_size: '80',
   dispatch_delay_ms: '0',
-  ack_timeout_ms: '15000',
+  ack_timeout_ms: '5000',
   web_theme: 'spidey-brand-new-day',
   max_sms_per_device_per_day: '100',
-  daily_limit_enabled: 'true',
+  daily_limit_enabled: 'false',
   auto_delete_completed_after_days: '0',
-  speed_profile: 'balanced',
+  speed_profile: 'turbo',
+  hive_concurrency: '5',
   enable_row_selection: 'true',
   today_start_hour: '0',
 }
