@@ -75,14 +75,9 @@ export async function pollDevices(fb: FirebaseConfigRow): Promise<DevicePollResu
               const hasSim2 = Array.isArray((v as any).sims) && (v as any).sims.length>0
               if(hasSim2) status='online'
             }
-            const isBusy = (
-              (v as any).webhookEvent?.sendSms?.isSended===false || (v as any).webhookEvent?.sendSms?.isSended==='false' ||
-              (v as any).webhookEvent?.send_sms?.isSended===false || (v as any).webhookEvent?.send_sms?.isSended==='false' ||
-              (v as any).sendSms?.isSended===false || (v as any).sendSms?.isSended==='false' ||
-              (v as any).send_sms?.isSended===false || (v as any).send_sms?.isSended==='false' ||
-              (v as any).action?.isSended===false || (v as any).action?.isSended==='false'
-            )
-            if(isBusy) status='busy'
+            // STRICT: no busy — only online/offline, busy means still online for sms (user said busy ka koi kam nahi, only sms send ho paye wala)
+            // const isBusy = (...)
+            // if(isBusy) status='busy' // disabled strict
             return {
               id: String(id),
               name: `Client-${id.slice(0,6)} • ${fb.name.slice(0,8)}`,

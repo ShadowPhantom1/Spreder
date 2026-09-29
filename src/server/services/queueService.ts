@@ -160,9 +160,10 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
   }
   const staleCutoff = new Date(Date.now() - 5*60*1000).toISOString()
   const baseOwnerFilter:any = ownerId ? {owner_id: ownerId} : {}
-  let rows = await Device.find({status: {$in:['online','busy']}, last_seen: {$gte: staleCutoff}, ...baseOwnerFilter}).sort({last_seen:-1}).lean() as any[]
+  // STRICT: only 'online' (busy means already sending, not available for new sms) + has_recharge=1 (recharge check)
+  let rows = await Device.find({status:'online', has_recharge:1, last_seen: {$gte: staleCutoff}, ...baseOwnerFilter}).sort({last_seen:-1}).lean() as any[]
   if(rows.length===0){
-    rows = await Device.find({status: {$in:['online','busy']}, ...baseOwnerFilter}).sort({last_seen:-1}).limit(100).lean() as any[]
+    rows = await Device.find({status:'online', has_recharge:1, ...baseOwnerFilter}).sort({last_seen:-1}).limit(100).lean() as any[]
   }
   rows = rows.map((r:any)=> ({...r, id:r._id}))
   const byHive = new Map<string, any[]>()
@@ -251,8 +252,9 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
     }
   }
   rows = perSlotRows
+  // no busy fallback — only online that can send (busy already sending, skip)
   if (rows.length === 0) {
-    let busyFilter:any={status:'busy'}
+    let busyFilter:any={status:'online', has_recharge:1}
     if(ownerId) busyFilter.owner_id=ownerId
     let r2 = await Device.find(busyFilter).sort({last_seen:-1}).limit(5).lean() as any[]
     r2=r2.map((r:any)=>({...r, id:r._id}))

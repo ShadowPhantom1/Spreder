@@ -164,7 +164,7 @@ router.post('/cleanup-low-online', async (req:any, res)=>{
   let threshold = Math.max(0, parseInt((req.body?.threshold ?? req.query.threshold) as string,10) || 0)
   const filter=ownerFilterFb(req)
   const firebases = await Firebase.find(filter).lean() as any[]
-  const matchStage:any={status:{$in:['online','busy']}}
+  const matchStage:any={status:'online', has_recharge:1}
   if(!isSuper(req)) matchStage.owner_id=req.user.id
   const counts = await Device.aggregate([{$match:matchStage}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[]
   const map = new Map<string,number>(counts.map((r:any)=>[r._id, r.c]))
