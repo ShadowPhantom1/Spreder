@@ -31,22 +31,16 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     if(!u) return res.status(401).json({ error: 'User not found' })
     if(u.is_active===0) return res.status(403).json({ error: 'Account disabled by Admin' })
     if(u.expires_at && new Date(u.expires_at) < new Date()) return res.status(403).json({ error: 'Account expired' })
-    // device lock removed — fully tenant isolated, kahi se bhi login
-    const sessCache = _sessCache.get(cacheKey)
-    if(!sessCache || Date.now() > sessCache.exp){
-      const {Session} = await import('../db/index.js')
-      const sess:any = await Session.findOne({_id: payload.id} as any).lean() || await Session.findOne({user_id: payload.id}).lean()
-      _sessCache.set(cacheKey,{tok: sess?.token||null, exp:Date.now()+10000})
-      if(sess && sess.token !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
-    } else {
-      if(sessCache.tok && sessCache.tok !== token) return res.status(401).json({ error: 'Logged in elsewhere — single device only' })
-    }
+    // AUDIT FIX: single-device lock removed (user wants kahi se bhi login, 1 ID 2 devices allow). Was causing 401 'Logged in elsewhere' after login due to stale 10s cache + blocking.
+    // Session check disabled for multi-device — only verify user exists/active, not token match.
+    // Keep session creation for audit but don't block on token mismatch.
     req.user = { ...payload, is_super: u.is_super } as any
     next()
   } catch(e:any) {
     return res.status(401).json({ error: 'Session expired — please login again.' })
   }
 }
+export function clearSessionCache(id:string){ _userCache.delete(id); _sessCache.delete(id) }
 export function superRequired(req: AuthedRequest, res: Response, next: NextFunction){
   const u = (req as any).user as any
   if(!u || u.is_super!==1) return res.status(403).json({ error: 'Super admin only' })

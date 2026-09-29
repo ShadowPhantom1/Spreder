@@ -36,6 +36,8 @@ router.post('/login', async (req, res) => {
   await Session.deleteOne({_id: user.id} as any).catch(()=>{})
   await Session.deleteOne({user_id: user.id} as any).catch(()=>{})
   await Session.create({_id: user.id, user_id: user.id, ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '', device_id: (req.headers['x-device-id'] as string) || 'web', token, last_active: new Date().toISOString()} as any).catch(()=>{})
+  // AUDIT FIX: clear auth cache so next request doesn't get 401 'Logged in elsewhere' due to stale 10s cache
+  try{ const {clearSessionCache}=await import('../middleware/auth.js'); clearSessionCache(user.id) }catch{}
   }catch(e:any){ res.status(500).json({error:e.message})}
 })
 
@@ -46,6 +48,7 @@ router.post('/logout', async (req:any, res) => {
       const p:any = jwt.verify(token, config.JWT_SECRET)
       await Session.deleteOne({_id: p.id} as any).catch(()=>{})
       await Session.deleteOne({user_id: p.id} as any).catch(()=>{})
+      try{ const {clearSessionCache}=await import('../middleware/auth.js'); clearSessionCache(p.id) }catch{}
     }
   }catch{}
   res.clearCookie('token', { path: '/' })

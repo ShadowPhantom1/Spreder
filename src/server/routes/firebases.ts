@@ -49,7 +49,25 @@ router.post('/', async (req:any, res) => {
   if(dup) return res.status(409).json({ error: `Duplicate hive — already exists as "${dup.name}"`, duplicateId: dup._id })
   const id = randomUUID()
   await Firebase.create({_id:id, id, name, database_url, service_account_json: service_account_json ? JSON.stringify(service_account_json) : null, status:'unknown', created_at:new Date().toISOString(), owner_id: req.user.id})
+  _invalidateCache('global')
   _invalidateCache(req.user.id)
+  // AUDIT FIX: immediate poll so new hive (crow) doesn't show 0 online for 5s+ (was waiting for next 5s poll cycle)
+  ;(async()=>{
+    try{
+      const devices = await firebaseService.pollDevices({id, name, database_url} as any)
+      const now=new Date().toISOString()
+      if(devices.length){
+        const fbOwner=req.user.id
+        const ops=devices.map((d:any)=>({
+          updateOne:{ filter:{_id:d.id}, update:{$set:{id:d.id, firebase_id:id, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, owner_id:fbOwner}, $setOnInsert:{_id:d.id, created_at:now, sim_count:1, has_recharge:1, sim1_recharge:1, sim2_recharge:1, owner_id:fbOwner}}, upsert:true}
+        }))
+        for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
+      }
+      const onlineCount=devices.filter((d:any)=>d.status==='online'||d.status==='busy').length
+      await Firebase.updateOne({_id:id}, {$set:{device_count:devices.length, online_count:onlineCount, status: onlineCount>0?'online': (devices.length>0?'offline':'offline'), last_polled_at: now}})
+      _invalidateCache('global')
+    }catch(e:any){ console.log('[Firebase POST] immediate poll fail', e.message)}
+  })()
   const created = await Firebase.findOne({_id:id}).lean()
   res.status(201).json({...created, id})
 })
@@ -64,6 +82,7 @@ router.put('/:id', async (req:any, res) => {
     database_url: database_url || existing.database_url,
     service_account_json: service_account_json ? JSON.stringify(service_account_json) : existing.service_account_json
   }})
+  _invalidateCache('global')
   _invalidateCache(req.user.id)
   const updated = await Firebase.findOne({_id:req.params.id}).lean()
   res.json({...updated, id: (updated as any)._id})
@@ -76,6 +95,7 @@ router.delete('/:id', async (req:any, res) => {
   if(!assertOwnerFb(fb, req)) return res.status(403).json({ error:'Not yours' })
   await Device.deleteMany({firebase_id:fid})
   await Firebase.deleteOne({_id:fid})
+  _invalidateCache('global')
   _invalidateCache(req.user.id)
   res.json({ ok: true })
 })
@@ -126,7 +146,7 @@ router.post('/bulk', async (req:any, res) => {
     const created=await Firebase.findOne({_id:id}).lean()
     out.push({...created, id})
   }
-  if(out.length) _invalidateCache(req.user.id)
+  if(out.length){ _invalidateCache('global'); _invalidateCache(req.user.id) }
   res.status(201).json({ imported: out.length, skippedDuplicates, autoNamed, firebases: out })
 })
 
@@ -158,7 +178,7 @@ router.post('/cleanup-low-online', async (req:any, res)=>{
     await Device.deleteMany({firebase_id:fb.id})
     await Firebase.deleteOne({_id:fb.id})
   }
-  if(toDelete.length) _invalidateCache(req.user.id)
+  _invalidateCache('global'); _invalidateCache(req.user.id)
   res.json({ deleted: toDelete.length, threshold, deletedHives: toDelete, message: `Deleted ${toDelete.length} hive(s) with online < ${threshold}` })
 })
 
@@ -176,6 +196,7 @@ router.post('/:id/cleanup', async (req:any, res)=>{
   if(threshold!==null && online < threshold){
     await Device.deleteMany({firebase_id:fb._id})
     await Firebase.deleteOne({_id:fb._id})
+    _invalidateCache('global')
     _invalidateCache(req.user.id)
     return res.json({ ok:true, deletedHive:true, online, total, threshold, message: `Hive deleted — had ${online} online < ${threshold}` })
   }
