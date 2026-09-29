@@ -60,7 +60,7 @@ app.get('/api/stats', async (req:any, res) => {
   const {filter:ownerFilter} = getStatsOwner(req)
   const cacheKey='global'
   const cached=_statsCacheMap.get(cacheKey)
-  if(cached && Date.now()-cached.ts < 3000) return res.json(cached.data)
+  if(cached && Date.now()-cached.ts < 8000) return res.json(cached.data)
   const {Firebase, Device, Campaign, CampaignMessage, Setting, DeviceDailyStat} = await import('./db/index.js')
   const istOffset = 5.5*60*60*1000
   const istNow = new Date(Date.now() + istOffset)
@@ -70,13 +70,17 @@ app.get('/api/stats', async (req:any, res) => {
   // AUDIT FIX: devices/firebases SHARED (global), campaigns per-owner (tenant). Was fully isolated -> z4x 0.
   const devMatch:any=null
   const campMatch:any=Object.keys(ownerFilter).length? {$match: ownerFilter} : null
-  const devAggPipeline:any[]= devMatch? [devMatch, {$group:{_id:null, total:{$sum:1}, online:{$sum:{$cond:[{$and:[{$eq:['$status','online']},{$eq:['$has_recharge',1]}]},1,0]}}, offline:{$sum:{$cond:[{$eq:['$status','offline']},1,0]}}, busy:{$sum:{$cond:[{$eq:['$status','busy']},1,0]}}, rechargeOnline:{$sum:{$cond:[{$and:[{$eq:['$has_recharge',1]},{$eq:['$status','online']}]},1,0]}}}}] : [{$group:{_id:null, total:{$sum:1}, online:{$sum:{$cond:[{$and:[{$eq:['$status','online']},{$eq:['$has_recharge',1]}]},1,0]}}, offline:{$sum:{$cond:[{$eq:['$status','offline']},1,0]}}, busy:{$sum:{$cond:[{$eq:['$status','busy']},1,0]}}, rechargeOnline:{$sum:{$cond:[{$and:[{$eq:['$has_recharge',1]},{$eq:['$status','online']}]},1,0]}}}}]
+  // SPEED: use indexed countDocuments instead of full aggregate (was 4.3s on 709 devices)
   const campAggPipeline:any[]= campMatch? [campMatch, {$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]: [{$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]
   const todayFilter:any={date:todayDate} // shared
   const todayFilterCamp:any={date:todayDate, ...ownerFilter}
-  const [fbCount, devStatsAgg, perSimDocRaw, checkRechargeDoc, devRows, todayAgg, campStatsAgg] = await Promise.all([
+  const [fbCount, totalCount, onlineCountRaw, offlineCount, busyCount, rechargeOnlineCount, perSimDocRaw, checkRechargeDoc, devRows, todayAgg, campStatsAgg] = await Promise.all([
     Firebase.countDocuments({}),
-    Device.aggregate(devAggPipeline) as Promise<any[]>,
+    Device.countDocuments({}) as Promise<number>,
+    Device.countDocuments({status:'online', has_recharge:1}) as Promise<number>,
+    Device.countDocuments({status:'offline'}) as Promise<number>,
+    Device.countDocuments({status:'busy'}) as Promise<number>,
+    Device.countDocuments({status:'online', has_recharge:1}) as Promise<number>,
     Setting.findOne({_id:'per_sim_limit'}).lean() as Promise<any>,
     Setting.findOne({_id:'check_recharge'}).lean() as Promise<any>,
     Device.find({status:'online'}).lean() as Promise<any[]>,
@@ -84,7 +88,7 @@ app.get('/api/stats', async (req:any, res) => {
     Campaign.aggregate(campAggPipeline) as Promise<any[]>,
   ])
   const todaySent=(todayAgg[0]?.total || 0) as number
-  const devStats = (devStatsAgg as any[])[0] || {total:0, online:0, offline:0, busy:0, rechargeOnline:0}
+  const devStats = {total: totalCount, online: onlineCountRaw, offline: offlineCount, busy: busyCount, rechargeOnline: rechargeOnlineCount}
   let perSimDoc = perSimDocRaw as any
   if(!perSimDoc) perSimDoc = await Setting.findOne({_id:'max_sms_per_device_per_day'}).lean() as any
   const perSim = parseInt(perSimDoc?.value || '100',10)

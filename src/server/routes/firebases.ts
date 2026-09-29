@@ -20,7 +20,7 @@ function _invalidateCache(ownerId?:string){
 function _getCache(ownerId:string){
   const c=_cacheMap.get(ownerId)
   // AUDIT FIX: was 10s stale (hives device on but windows 0 for 10s). Now 3s for near-realtime.
-  if(c && Date.now()-c.ts < 3000) return c.data
+  if(c && Date.now()-c.ts < 8000) return c.data
   return null
 }
 router.get('/', async (req:any, res) => {

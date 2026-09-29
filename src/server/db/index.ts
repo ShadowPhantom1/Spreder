@@ -34,6 +34,15 @@ Promise.all([
   Session.syncIndexes().catch(()=>{}),
   DeviceDailyStat.syncIndexes().catch(()=>{}),
 ]).then(()=> console.log('[DB] indexes synced')).catch(()=>{})
+// SPEED: additional indexes for hives stats (was slow 2.6s + 4.3s on 709 devices)
+try{
+  await Device.collection.createIndex({status:1})
+  await Device.collection.createIndex({firebase_id:1})
+  await Device.collection.createIndex({firebase_id:1, status:1})
+  await Device.collection.createIndex({last_seen:-1})
+  await DeviceDailyStat.collection.createIndex({date:1})
+  console.log('[DB] speed indexes ok')
+}catch{}
 
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
