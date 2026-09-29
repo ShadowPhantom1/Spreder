@@ -46,15 +46,55 @@ try{
 
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
+// STRICT: only ONE super — if ADMIN_USER changed in env, update existing super instead of creating duplicate (was creating 2 supers)
+// Find any existing super (old admin) — there should be only one
 const adminExists = await User.findOne({username: config.ADMIN_USER}).lean() as any
+const existingSupers = await User.find({is_super:1}).lean() as any[]
 if (!adminExists) {
+  if(existingSupers.length>0){
+    // Env changed (e.g. admin -> shadowphantom): reuse old super's _id, update username+password, delete duplicates
+    const keep = existingSupers[0]
+    const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
+    await User.updateOne({_id: keep._id}, {$set:{username: config.ADMIN_USER, password_hash: hash, is_super:1, is_active:1, role:'admin'}})
+    console.log(`[DB] Updated existing super ${keep.username} (${String(keep._id).slice(0,8)}) -> ${config.ADMIN_USER} (env changed, no duplicate)`)
+    // delete any extra supers (duplicates)
+    for(const dup of existingSupers.slice(1)){
+      await User.deleteOne({_id: dup._id})
+      console.log(`[DB] Deleted duplicate super ${dup.username} ${String(dup._id).slice(0,8)}`)
+    }
+    // also handle the case where we just updated keep but there might be a newly created duplicate with same username race — ensure only one left
+    const stillDups = await User.find({is_super:1}).lean() as any[]
+    if(stillDups.length>1){
+      for(const dup of stillDups.filter((u:any)=> String(u._id)!==String(keep._id))){
+        await User.deleteOne({_id: dup._id})
+        console.log(`[DB] Deleted extra super after update ${dup.username}`)
+      }
+    }
+  } else {
+    const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
+    const id=randomUUID()
+    await User.create({_id:id, username: config.ADMIN_USER, password_hash:hash, role:'admin', is_super:1, is_active:1, allowed_device:null, per_sim_limit:100, max_devices:100, expires_at:null, created_at:new Date().toISOString()} as any)
+    console.log(`[DB] Seeded super admin Mongo: ${config.ADMIN_USER}`)
+  }
+} else {
+  // exists with correct username — ensure password matches env (if env pass changed, update hash) and only one super
   const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
-  const id=randomUUID()
-  await User.create({_id:id, username: config.ADMIN_USER, password_hash:hash, role:'admin', is_super:1, is_active:1, allowed_device:null, per_sim_limit:100, max_devices:100, expires_at:null, created_at:new Date().toISOString()} as any)
-  console.log(`[DB] Seeded super admin Mongo: ${config.ADMIN_USER}`)
-} else if(adminExists.is_super!==1){
-  await User.updateOne({username: config.ADMIN_USER}, {$set:{is_super:1, is_active:1}})
-  console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
+  // Only update password if it doesn't match (compare sync would be needed, but we just update to env hash for strict)
+  // To avoid rehash every restart, check if count of supers >1 then dedup, otherwise just ensure active
+  if(adminExists.is_super!==1){
+    await User.updateOne({username: config.ADMIN_USER}, {$set:{is_super:1, is_active:1}})
+    console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
+  }
+  // If password in env changed, update it (so old admin pass becomes shadow phantom)
+  // We always sync password to env on boot for super
+  await User.updateOne({_id: adminExists._id}, {$set:{password_hash: hash, is_active:1}})
+  console.log(`[DB] Synced super password to env for ${config.ADMIN_USER}`)
+  if(existingSupers.length>1){
+    for(const dup of existingSupers.filter((u:any)=> String(u._id)!==String(adminExists._id))){
+      await User.deleteOne({_id: dup._id})
+      console.log(`[DB] Deleted duplicate super ${dup.username} ${String(dup._id).slice(0,8)} (keep ${config.ADMIN_USER})`)
+    }
+  }
 }
 
 const defaults: Record<string,string> = {
