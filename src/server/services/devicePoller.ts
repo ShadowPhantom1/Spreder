@@ -57,7 +57,7 @@ async function pollAll() {
                   filter: {_id: d.id},
                   update: {
                     $set: { id:d.id, firebase_id:fbId, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, owner_id: fbOwner },
-                    $setOnInsert: { _id:d.id, created_at: now, sim_count:defaultSim, has_recharge:1, sim1_recharge:1, sim2_recharge:1, owner_id: fbOwner }
+                    $setOnInsert: { _id:d.id, created_at: now, sim_count:defaultSim, has_recharge:1, sim1_recharge:1, sim2_recharge:1 }
                   },
                   upsert: true
                 }

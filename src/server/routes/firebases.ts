@@ -51,25 +51,30 @@ router.post('/', async (req:any, res) => {
   await Firebase.create({_id:id, id, name, database_url, service_account_json: service_account_json ? JSON.stringify(service_account_json) : null, status:'unknown', created_at:new Date().toISOString(), owner_id: req.user.id})
   _invalidateCache('global')
   _invalidateCache(req.user.id)
-  // AUDIT FIX: immediate poll so new hive (crow) doesn't show 0 online for 5s+ (was waiting for next 5s poll cycle)
-  ;(async()=>{
-    try{
-      const devices = await firebaseService.pollDevices({id, name, database_url} as any)
-      const now=new Date().toISOString()
-      if(devices.length){
-        const fbOwner=req.user.id
-        const ops=devices.map((d:any)=>({
-          updateOne:{ filter:{_id:d.id}, update:{$set:{id:d.id, firebase_id:id, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, owner_id:fbOwner}, $setOnInsert:{_id:d.id, created_at:now, sim_count:1, has_recharge:1, sim1_recharge:1, sim2_recharge:1, owner_id:fbOwner}}, upsert:true}
-        }))
-        for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
-      }
-      const onlineCount=devices.filter((d:any)=>d.status==='online').length
-      await Firebase.updateOne({_id:id}, {$set:{device_count:devices.length, online_count:onlineCount, status: onlineCount>0?'online': (devices.length>0?'offline':'offline'), last_polled_at: now}})
-      _invalidateCache('global')
-    }catch(e:any){ console.log('[Firebase POST] immediate poll fail', e.message)}
-  })()
+  // STRICT: await immediate poll (6s timeout) so new hive never shows 0 online — was fire-and-forget and failed due to duplicate owner_id bug
+  let devices:any[]=[]
+  try{
+    devices = await Promise.race([
+      firebaseService.pollDevices({id, name, database_url} as any),
+      new Promise<any[]>((_,rej)=> setTimeout(()=>rej(new Error('poll timeout 6s')), 6000))
+    ])
+    const now=new Date().toISOString()
+    if(devices.length){
+      const fbOwner=req.user.id
+      const ops=devices.map((d:any)=>({
+        updateOne:{ filter:{_id:d.id}, update:{$set:{id:d.id, firebase_id:id, name:d.name, model:d.model||null, status:d.status, battery:d.battery??null, signal:d.signal??null, last_seen:d.last_seen||now, owner_id:fbOwner}, $setOnInsert:{_id:d.id, created_at:now, sim_count:1, has_recharge:1, sim1_recharge:1, sim2_recharge:1}}, upsert:true}
+      }))
+      for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
+    }
+    const onlineCount=devices.filter((d:any)=>d.status==='online').length
+    await Firebase.updateOne({_id:id}, {$set:{device_count:devices.length, online_count:onlineCount, status: onlineCount>0?'online': (devices.length>0?'offline':'offline'), last_polled_at: now}})
+    _invalidateCache('global')
+  }catch(e:any){ console.log('[Firebase POST] immediate poll fail (non-blocking)', e.message)}
   const created = await Firebase.findOne({_id:id}).lean()
-  res.status(201).json({...created, id})
+  // enrich with online_count for immediate UI (global view)
+  const enrichedCreated:any={...created, id}
+  if(devices.length) enrichedCreated.online_count=devices.filter((d:any)=>d.status==='online').length
+  res.status(201).json(enrichedCreated)
 })
 
 router.put('/:id', async (req:any, res) => {
