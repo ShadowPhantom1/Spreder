@@ -57,8 +57,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'BHNSTOCK SM
 
 app.get('/api/stats', async (req:any, res) => {
   // AUDIT FIX: devices/firebases are SHARED (all see same hives, fixes Windows 0 while hive has 26). Campaigns stay per-owner.
-  const {filter:ownerFilter} = getStatsOwner(req)
-  const cacheKey='global'
+  const {filter:ownerFilter, cacheKey} = getStatsOwner(req)
   const cached=_statsCacheMap.get(cacheKey)
   if(cached && Date.now()-cached.ts < 8000) return res.json(cached.data)
   const {Firebase, Device, Campaign, CampaignMessage, Setting, DeviceDailyStat} = await import('./db/index.js')
@@ -72,18 +71,19 @@ app.get('/api/stats', async (req:any, res) => {
   const campMatch:any=Object.keys(ownerFilter).length? {$match: ownerFilter} : null
   // SPEED: use indexed countDocuments instead of full aggregate (was 4.3s on 709 devices)
   const campAggPipeline:any[]= campMatch? [campMatch, {$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]: [{$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]
-  const todayFilter:any={date:todayDate} // shared
+  const todayFilter:any=Object.keys(ownerFilter).length? {date:todayDate, ...ownerFilter} : {date:todayDate}
   const todayFilterCamp:any={date:todayDate, ...ownerFilter}
+  const devFilter:any=ownerFilter
   const [fbCount, totalCount, onlineCountRaw, offlineCount, busyCount, rechargeOnlineCount, perSimDocRaw, checkRechargeDoc, devRows, todayAgg, campStatsAgg] = await Promise.all([
-    Firebase.countDocuments({}),
-    Device.countDocuments({}) as Promise<number>,
-    Device.countDocuments({status:'online', has_recharge:1}) as Promise<number>,
-    Device.countDocuments({status:'offline'}) as Promise<number>,
-    Device.countDocuments({status:'busy'}) as Promise<number>,
-    Device.countDocuments({status:'online', has_recharge:1}) as Promise<number>,
+    Firebase.countDocuments(ownerFilter),
+    Device.countDocuments(devFilter) as Promise<number>,
+    Device.countDocuments({status:'online', has_recharge:1, ...devFilter}) as Promise<number>,
+    Device.countDocuments({status:'offline', ...devFilter}) as Promise<number>,
+    Device.countDocuments({status:'busy', ...devFilter}) as Promise<number>,
+    Device.countDocuments({status:'online', has_recharge:1, ...devFilter}) as Promise<number>,
     Setting.findOne({_id:'per_sim_limit'}).lean() as Promise<any>,
     Setting.findOne({_id:'check_recharge'}).lean() as Promise<any>,
-    Device.find({status:'online'}).lean() as Promise<any[]>,
+    Device.find({status:'online', ...devFilter}).lean() as Promise<any[]>,
     DeviceDailyStat.aggregate([{$match:todayFilter}, {$group:{_id:null, total:{$sum:'$count'}}}]) as Promise<any[]>,
     Campaign.aggregate(campAggPipeline) as Promise<any[]>,
   ])
@@ -103,7 +103,7 @@ app.get('/api/stats', async (req:any, res) => {
   }
   const remaining=Math.max(0, totalCapacity - (todaySent as number))
   const campStats = (campStatsAgg as any[])[0] || {total:0, running:0, completed:0, draft:0, totalSent:0, totalFailed:0}
-  // per-device today via DeviceDailyStat (shared, not per-owner)
+  // per-device today via DeviceDailyStat — per-user (super global)
   const todayByDevice = await DeviceDailyStat.aggregate([
     {$match:todayFilter},
     {$group:{_id:'$device_id', c:{$sum:'$count'}}},
@@ -129,9 +129,9 @@ app.get('/api/stats/today', async (req:any, res)=>{
   const todayDate=getTodayDateIST()
   try{
     const {CampaignMessage, DeviceDailyStat} = await import('./db/index.js')
-    const todayFilter:any={date:todayDate} // shared
+    const todayFilter:any=Object.keys(ownerFilter).length? {date:todayDate, ...ownerFilter} : {date:todayDate}
     const todayFilterCamp:any={date:todayDate, ...ownerFilter}
-    // total via DeviceDailyStat (shared)
+    // total via DeviceDailyStat — per-user
     const aggTotal=await DeviceDailyStat.aggregate([{$match:todayFilter}, {$group:{_id:null, total:{$sum:'$count'}}}]) as any[]
     const total=aggTotal[0]?.total || 0
     const byDeviceAgg = await DeviceDailyStat.aggregate([
