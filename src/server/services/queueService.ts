@@ -354,10 +354,9 @@ export async function processCampaign(campaignId: string) {
     console.log(`[Queue] found ${flat.length} pending for ${campaignId}`)
     if (flat.length === 0) break
     console.log(`[Queue] fetching devices for ${campaignId}`)
-    // MULTI-TENANCY: har user ke apne devices — campaign owner ke hisab se filter
-    const ownerForDevices = campaign.owner_id || null
-    const devices = await getOnlineDevices(ownerForDevices)
-    console.log(`[Queue] devices ${devices.length} for ${campaignId} owner ${String(ownerForDevices||'global').slice(0,8)}`)
+    // FIX ROOT CAUSE: rty 0/7896 stuck — campaign owner crow has 0 devices, all 460 owned by admin. Was per-owner, now GLOBAL (shared hives). Har account me work kare.
+    const devices = await getOnlineDevices(null as any)
+    console.log(`[Queue] devices ${devices.length} for ${campaignId} owner global`)
     if (devices.length === 0) {
       emit('campaign:log', { campaignId, level: 'warn', msg: 'No online devices — retrying in 3s… 🕸️' })
       await new Promise(r => setTimeout(r, 3000))
