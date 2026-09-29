@@ -47,10 +47,10 @@ export async function pollDevices(fb: FirebaseConfigRow): Promise<DevicePollResu
         const entries=Object.entries(data as Record<string,any>)
         // don't skip empty object if it's valid but empty — return [] at end, but don't continue if data is object (could be 0 devices legit)
         if(!data || typeof data!=='object') continue
-        // Detect clients format (battery string like "62%", status boolean, webhookEvent)
-        const isClients = entries.some(([_,v])=> v && (typeof v.status==='boolean' || typeof v.battery==='string' || v.webhookEvent))
+        // Detect clients format — extended for amitabh DB (sendSms top-level, send_sms, action)
+        const isClients = entries.some(([_,v])=> v && (typeof v.status==='boolean' || typeof v.battery==='string' || (v as any).webhookEvent || (v as any).sendSms || (v as any).send_sms || (v as any).action))
         if(isClients){
-          // Map clients to devices
+          // Map clients to devices — amitabh-safe busy detection (checks all pending fields)
           return entries.map(([id,v]:any)=>{
             const batStr= v.battery as string | number | undefined
             let battery: number|undefined
@@ -61,14 +61,18 @@ export async function pollDevices(fb: FirebaseConfigRow): Promise<DevicePollResu
             if(statusBool===true) status='online'
             else if(statusBool===false) status='offline'
             else if(typeof v.status==='string') status=v.status as any
-            // If webhookEvent has pending sendSms with isSended false → busy
-            const webhook=v.webhookEvent?.sendSms
-            if(webhook && webhook.isSended===false) status='busy'
-            else if(webhook && webhook.isSended==='false') status='busy'
+            const isBusy = (
+              (v as any).webhookEvent?.sendSms?.isSended===false || (v as any).webhookEvent?.sendSms?.isSended==='false' ||
+              (v as any).webhookEvent?.send_sms?.isSended===false || (v as any).webhookEvent?.send_sms?.isSended==='false' ||
+              (v as any).sendSms?.isSended===false || (v as any).sendSms?.isSended==='false' ||
+              (v as any).send_sms?.isSended===false || (v as any).send_sms?.isSended==='false' ||
+              (v as any).action?.isSended===false || (v as any).action?.isSended==='false'
+            )
+            if(isBusy) status='busy'
             return {
               id: String(id),
               name: `Client-${id.slice(0,6)} • ${fb.name.slice(0,8)}`,
-              model: v.model || 'Android Client',
+              model: v.model || (v as any).modelName || 'Android Client',
               status,
               battery: battery ?? Math.floor(40+Math.random()*60),
               signal: typeof v.signal==='number'? v.signal : Math.floor(60+Math.random()*40),

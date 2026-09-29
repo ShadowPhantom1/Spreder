@@ -142,7 +142,8 @@ export async function runValidatorCycle(){
             const prev=cur?.validator_fail_count || 0
             const fails=prev+1
             await Device.updateOne({_id: dev.id}, {$set:{validated_score:pass, validator_fail_count:fails}})
-            if(fails>=2){
+            // AUDIT FIX: was 2 fails -> offline (too aggressive, caused 0 online after validator cycle). Now 3 fails and only if validator DB set.
+            if(fails>=3){
               await Device.updateOne({_id: dev.id}, {$set:{status:'offline', validated_at:now}})
               console.log(`[Validator] DROP ${dev.id.slice(0,8)} ${pass}/${total} perSlot ${perSlot.join(',')} ❌ → offline (fail ${fails})`)
             } else {

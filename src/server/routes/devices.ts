@@ -10,7 +10,8 @@ function isSuper(req:any){ return req.user?.is_super===1 }
 router.get('/', async (req:any, res) => {
   const { firebase_id, status, q } = req.query as any
   const filter:any={}
-  if(!isSuper(req)) filter.owner_id=req.user.id
+  // AUDIT FIX: devices shared via hives — all see all (was per-owner, caused Windows 0 online for z4x while admin had 26). Hive write still per-owner.
+  // if(!isSuper(req)) filter.owner_id=req.user.id // disabled for shared view
   if (firebase_id) filter.firebase_id = firebase_id
   if (status) filter.status = status
   if (q) filter.$or=[{name:{$regex:q, $options:'i'}}, {model:{$regex:q, $options:'i'}}]
@@ -29,7 +30,7 @@ router.get('/', async (req:any, res) => {
 router.get('/:id', async (req:any, res) => {
   const row = await Device.findOne({_id:req.params.id}).lean() as any
   if (!row) return res.status(404).json({ error: 'Device not found' })
-  if(!isSuper(req) && row.owner_id!==req.user.id) return res.status(403).json({ error:'Not yours' })
+  // AUDIT FIX: read shared (was per-owner, z4x couldn't see admin's device)
   const fb=await Firebase.findOne({_id:row.firebase_id}).lean() as any
   res.json({...row, id:row._id, firebase_name: fb?.name})
 })

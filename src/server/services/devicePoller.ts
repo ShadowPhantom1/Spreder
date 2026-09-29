@@ -50,7 +50,8 @@ async function pollAll() {
           if (devices.length>0) {
             const fbOwner = (fb as any).owner_id || null
             const ops = devices.map((d:any)=>{
-              if(d.status==='busy' && !d.name.includes('pending')) d.status='online'
+              // AUDIT FIX: keep busy as busy (was converting to online and losing busy count -> Windows 0 bug). Only convert if explicitly needed elsewhere.
+              // if(d.status==='busy' && !d.name.includes('pending')) d.status='online' // disabled for accurate busy tracking
               return {
                 updateOne: {
                   filter: {_id: d.id},
@@ -65,8 +66,10 @@ async function pollAll() {
             // chunk bulkWrites to avoid 16MB limit
             for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
           }
-          const fbStatus = devices.length===0 ? 'offline' : 'online'
-          await Firebase.updateOne({_id:fbId}, {$set:{device_count:devices.length, status:fbStatus}})
+          // AUDIT FIX: status based on online/busy count, not total (hive with 460 total but 26 online was wrongly offline before due to total check + stale poller after Render crash)
+          const onlineCount = devices.filter((d:any)=> d.status==='online' || d.status==='busy').length
+          const fbStatus = onlineCount>0 ? 'online' : (devices.length>0 ? 'offline' : 'offline')
+          await Firebase.updateOne({_id:fbId}, {$set:{device_count:devices.length, online_count: onlineCount, status:fbStatus, last_polled_at: now}})
           if (io) {
             io.emit('devices:update', { firebaseId: fbId, count: devices.length, devices: devices.slice(0, 8) })
             io.emit('firebases:update', { id: fbId, device_count: devices.length, status: 'online' })

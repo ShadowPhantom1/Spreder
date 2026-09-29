@@ -81,6 +81,28 @@ try{
     await mig(QueueItem, 'queue_items')
   }
 }catch(e:any){ console.log('[DB] tenant migration skip', e.message) }
+// AUDIT FIX: orphan devices + duplicate hive URL cleanup (global duplicate caused z4x 0 + owner flip-flop)
+try{
+  const allFbIds = await Firebase.distinct('_id') as any[]
+  if(allFbIds.length>=0){
+    const orphan = await Device.deleteMany({firebase_id: {$nin: allFbIds.length? allFbIds : ['__none__']}})
+    if((orphan as any).deletedCount) console.log(`[DB] cleaned orphan devices x${(orphan as any).deletedCount} (hive deleted, no Firebase)`)
+  }
+  const allFbs = await Firebase.find().lean() as any[]
+  const seen = new Map<string, any>()
+  let dupDel=0
+  for(const fb of allFbs){
+    const norm = String(fb.database_url||'').trim().toLowerCase().replace(/\.json$/,'').replace(/\/$/,'')
+    if(!norm) continue
+    if(seen.has(norm)){
+      await Firebase.deleteOne({_id: fb._id})
+      await Device.deleteMany({firebase_id: fb._id})
+      dupDel++
+      console.log(`[DB] deleted duplicate hive ${fb.name} ${String(fb._id).slice(0,8)} url=${norm} (kept ${String(seen.get(norm)._id).slice(0,8)})`)
+    } else seen.set(norm, fb)
+  }
+  if(dupDel) console.log(`[DB] duplicate hive cleanup x${dupDel}`)
+}catch(e:any){ console.log('[DB] orphan/duplicate cleanup skip', e.message) }
 try{
   const istOffset=5.5*60*60*1000
   const ist=new Date(Date.now()+istOffset)
