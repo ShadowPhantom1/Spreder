@@ -58,23 +58,9 @@ export async function pollDevices(fb: FirebaseConfigRow): Promise<DevicePollResu
             else if(typeof batStr==='number') battery=batStr
             const statusBool = v.status
             let status:'online'|'offline'|'busy' = 'offline'
-            // ADV FIX: Firebase me jitne bhi dikhenge utne web me online — sms send ho paye wala online
-            // Pehle status:false wale 357 offline gine ja rahe the, ab sim+model+battery wale ko online maano (adv level, validator alag se offline karega agar sach me fail)
             if(statusBool===true) status='online'
-            else if(statusBool===false){
-              // agar sim hai aur model/battery hai toh bhi online (amitabh me 388 false the, sabke sim hai)
-              const hasSim = Array.isArray((v as any).sims) && (v as any).sims.length>0
-              const hasModel = !!(v as any).modelName || !!(v as any).model
-              // battery 2% bhi online (kam dikh raha isliye)
-              if(hasSim && hasModel) status='online'
-              else status='offline'
-            }
+            else if(statusBool===false) status='offline'
             else if(typeof v.status==='string') status=v.status as any
-            else {
-              // no status field but has sim => online (adv)
-              const hasSim2 = Array.isArray((v as any).sims) && (v as any).sims.length>0
-              if(hasSim2) status='online'
-            }
             // STRICT: no busy — only online/offline, busy means still online for sms (user said busy ka koi kam nahi, only sms send ho paye wala)
             // const isBusy = (...)
             // if(isBusy) status='busy' // disabled strict
