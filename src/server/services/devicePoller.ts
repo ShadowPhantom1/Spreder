@@ -67,7 +67,7 @@ async function pollAll() {
             for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
           }
           // AUDIT FIX: status based on online/busy count, not total (hive with 460 total but 26 online was wrongly offline before due to total check + stale poller after Render crash)
-          const onlineCount = devices.filter((d:any)=> d.status==='online' || d.status==='busy').length
+          const onlineCount = devices.filter((d:any)=> d.status==='online').length
           const fbStatus = onlineCount>0 ? 'online' : (devices.length>0 ? 'offline' : 'offline')
           await Firebase.updateOne({_id:fbId}, {$set:{device_count:devices.length, online_count: onlineCount, status:fbStatus, last_polled_at: now}})
           if (io) {

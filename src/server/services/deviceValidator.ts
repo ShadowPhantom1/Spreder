@@ -118,7 +118,7 @@ export async function runValidatorCycle(){
   running=true
   try{
     const validatorBase = await getValidatorBase()
-    const rows = await Device.find({status: {$in:['online','busy']}}).sort({last_seen:-1}).lean() as any[]
+    const rows = await Device.find({status:'online'}).sort({last_seen:-1}).lean() as any[]
     const mapped = rows.map((r:any)=> ({...r, id:r._id}))
     if(mapped.length===0) return
     console.log(`[Validator] cycle start ${mapped.length} devices, validator=${validatorBase? 'yes':'ack-only'}`)

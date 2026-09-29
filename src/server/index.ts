@@ -79,7 +79,7 @@ app.get('/api/stats', async (req:any, res) => {
     Device.aggregate(devAggPipeline) as Promise<any[]>,
     Setting.findOne({_id:'per_sim_limit'}).lean() as Promise<any>,
     Setting.findOne({_id:'check_recharge'}).lean() as Promise<any>,
-    Device.find({status:{$in:['online','busy']}}).lean() as Promise<any[]>,
+    Device.find({status:'online'}).lean() as Promise<any[]>,
     DeviceDailyStat.aggregate([{$match:todayFilter}, {$group:{_id:null, total:{$sum:'$count'}}}]) as Promise<any[]>,
     Campaign.aggregate(campAggPipeline) as Promise<any[]>,
   ])

@@ -30,7 +30,7 @@ router.get('/', async (req:any, res) => {
   const cached=_getCache(cacheKey)
   if(cached) return res.json(cached)
   const rows = await Firebase.find(filter).sort({created_at:-1}).lean() as any[]
-  const matchStage:any={status:{$in:['online','busy']}}
+  const matchStage:any={status:'online'}
   const counts = await Device.aggregate([{$match:matchStage}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[]
   const onlineMap = new Map<string, number>(counts.map((r:any)=>[r._id, r.c]))
   const enriched = rows.map((r:any)=> ({...r, id:r._id, online_count: onlineMap.get(r._id) ?? 0 }))
@@ -63,7 +63,7 @@ router.post('/', async (req:any, res) => {
         }))
         for(let k=0;k<ops.length;k+=500) await Device.bulkWrite(ops.slice(k,k+500) as any, {ordered:false})
       }
-      const onlineCount=devices.filter((d:any)=>d.status==='online'||d.status==='busy').length
+      const onlineCount=devices.filter((d:any)=>d.status==='online').length
       await Firebase.updateOne({_id:id}, {$set:{device_count:devices.length, online_count:onlineCount, status: onlineCount>0?'online': (devices.length>0?'offline':'offline'), last_polled_at: now}})
       _invalidateCache('global')
     }catch(e:any){ console.log('[Firebase POST] immediate poll fail', e.message)}
@@ -187,8 +187,8 @@ router.post('/:id/cleanup', async (req:any, res)=>{
   if(!fb) return res.status(404).json({ error: 'Hive not found' })
   if(!assertOwnerFb(fb, req)) return res.status(403).json({ error:'Not yours' })
   const threshold = req.body?.threshold ? parseInt(req.body.threshold,10) : null
-  // AUDIT FIX: count online+busy as online (was only online, busy devices missed -> 0 online bug)
-  const online = await Device.countDocuments({firebase_id:fb._id, status:{$in:['online','busy']}})
+  // STRICT: only online counted (busy not counted, user said only online wale)
+  const online = await Device.countDocuments({firebase_id:fb._id, status:'online'})
   const total = await Device.countDocuments({firebase_id:fb._id})
   if(threshold!==null && online >= threshold){
     return res.json({ ok:false, online, total, threshold, message: `Skipped — hive has ${online} online >= ${threshold}, not cleaning` })
@@ -200,7 +200,7 @@ router.post('/:id/cleanup', async (req:any, res)=>{
     _invalidateCache(req.user.id)
     return res.json({ ok:true, deletedHive:true, online, total, threshold, message: `Hive deleted — had ${online} online < ${threshold}` })
   }
-  const del = await Device.deleteMany({firebase_id:fb._id, status:{$nin:['online','busy']}})
+  const del = await Device.deleteMany({firebase_id:fb._id, status:{$ne:'online'}})
   res.json({ ok:true, deletedOffline: del.deletedCount, online, total, message: `Cleaned ${del.deletedCount} offline devices, kept ${online} online` })
 })
 
