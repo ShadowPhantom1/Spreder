@@ -67,8 +67,8 @@ app.get('/api/stats', async (req:any, res) => {
   istNow.setUTCHours(0,0,0,0)
   const todayISO=new Date(istNow.getTime() - istOffset).toISOString()
   const todayDate=getTodayDateIST()
-  // AUDIT FIX: devices/firebases SHARED (global), campaigns per-owner (tenant). Was fully isolated -> z4x 0.
-  const devMatch:any=null
+  // PER-USER: har user ka alg stats (devices per-owner, firebases per-owner) — super global
+  const devMatch:any=Object.keys(ownerFilter).length? {$match: ownerFilter} : null
   const campMatch:any=Object.keys(ownerFilter).length? {$match: ownerFilter} : null
   // SPEED: use indexed countDocuments instead of full aggregate (was 4.3s on 709 devices)
   const campAggPipeline:any[]= campMatch? [campMatch, {$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]: [{$group:{_id:null, total:{$sum:1}, running:{$sum:{$cond:[{$eq:['$status','running']},1,0]}}, completed:{$sum:{$cond:[{$eq:['$status','completed']},1,0]}}, draft:{$sum:{$cond:[{$eq:['$status','draft']},1,0]}}, totalSent:{$sum:'$sent'}, totalFailed:{$sum:'$failed'}}}]

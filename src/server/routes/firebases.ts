@@ -24,14 +24,17 @@ function _getCache(ownerId:string){
   return null
 }
 router.get('/', async (req:any, res) => {
-  // AUDIT FIX: hives are SHARED infrastructure — all users see all hives (was per-owner, caused z4x 0 online while admin had 26). Write still per-owner via assertOwnerFb.
-  const filter:any={}
-  const cacheKey='global'
+  // PER-USER: har user ka apna hive dikhega (super sab dekhega). Was shared global, now per-owner as user wants.
+  const filter=ownerFilterFb(req)
+  const cacheKey=isSuper(req)? 'global' : req.user.id
   const cached=_getCache(cacheKey)
   if(cached) return res.json(cached)
   const rows = await Firebase.find(filter).sort({created_at:-1}).lean() as any[]
-  const matchStage:any={status:'online'}
-  const counts = await Device.aggregate([{$match:matchStage}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[]
+  // counts only for this user's hives (or all for super)
+  const hiveIds=rows.map((r:any)=>r._id)
+  const matchStage:any={status:'online', firebase_id:{$in:hiveIds}}
+  // also restrict by owner for non-super? devices are per-hive so firebase_id filter is enough, but keep has_recharge for strict
+  const counts = hiveIds.length? await Device.aggregate([{$match:matchStage}, {$group:{_id:'$firebase_id', c:{$sum:1}}}]) as any[] : []
   const onlineMap = new Map<string, number>(counts.map((r:any)=>[r._id, r.c]))
   const enriched = rows.map((r:any)=> ({...r, id:r._id, online_count: onlineMap.get(r._id) ?? 0 }))
   _cacheMap.set(cacheKey,{data:enriched, ts:Date.now()})
@@ -43,14 +46,13 @@ router.post('/', async (req:any, res) => {
   if (!name || !database_url) return res.status(400).json({ error: 'name & database_url required' })
   try { new URL(database_url) } catch { return res.status(400).json({ error: 'Invalid database_url' }) }
   const norm = normalizeUrl(database_url)
-  // AUDIT FIX: duplicate check must be GLOBAL (same URL for different owners caused 2 hives for amitabh + device owner flip-flop + z4x 0 devices). Was per-owner before.
-  const existing = await Firebase.find().lean() as any[]
+  // PER-USER: duplicate check per-owner (har user ka alg hive) — global nahi, sirf apne account me same URL block
+  const existing = await Firebase.find(ownerFilterFb(req)).lean() as any[]
   const dup = existing.find((f:any)=> normalizeUrl(f.database_url)===norm)
-  if(dup) return res.status(409).json({ error: `Duplicate hive — already exists as "${dup.name}"`, duplicateId: dup._id })
+  if(dup) return res.status(409).json({ error: `Duplicate hive — already exists as "${dup.name}" in your account`, duplicateId: dup._id })
   const id = randomUUID()
   await Firebase.create({_id:id, id, name, database_url, service_account_json: service_account_json ? JSON.stringify(service_account_json) : null, status:'unknown', created_at:new Date().toISOString(), owner_id: req.user.id})
-  _invalidateCache('global')
-  _invalidateCache(req.user.id)
+  _invalidateCache(isSuper(req)? 'global' : req.user.id)
   // STRICT: await immediate poll (6s timeout) so new hive never shows 0 online — was fire-and-forget and failed due to duplicate owner_id bug
   let devices:any[]=[]
   try{
@@ -68,7 +70,7 @@ router.post('/', async (req:any, res) => {
     }
     const onlineCount=devices.filter((d:any)=>d.status==='online').length
     await Firebase.updateOne({_id:id}, {$set:{device_count:devices.length, online_count:onlineCount, status: onlineCount>0?'online': (devices.length>0?'offline':'offline'), last_polled_at: now}})
-    _invalidateCache('global')
+    _invalidateCache(isSuper(req)? 'global' : req.user.id)
   }catch(e:any){ console.log('[Firebase POST] immediate poll fail (non-blocking)', e.message)}
   const created = await Firebase.findOne({_id:id}).lean()
   // enrich with online_count for immediate UI (global view)
@@ -87,8 +89,7 @@ router.put('/:id', async (req:any, res) => {
     database_url: database_url || existing.database_url,
     service_account_json: service_account_json ? JSON.stringify(service_account_json) : existing.service_account_json
   }})
-  _invalidateCache('global')
-  _invalidateCache(req.user.id)
+  _invalidateCache(isSuper(req)? 'global' : req.user.id)
   const updated = await Firebase.findOne({_id:req.params.id}).lean()
   res.json({...updated, id: (updated as any)._id})
 })
@@ -100,8 +101,7 @@ router.delete('/:id', async (req:any, res) => {
   if(!assertOwnerFb(fb, req)) return res.status(403).json({ error:'Not yours' })
   await Device.deleteMany({firebase_id:fid})
   await Firebase.deleteOne({_id:fid})
-  _invalidateCache('global')
-  _invalidateCache(req.user.id)
+  _invalidateCache(isSuper(req)? 'global' : req.user.id)
   res.json({ ok: true })
 })
 
@@ -129,8 +129,8 @@ router.post('/bulk', async (req:any, res) => {
   const out: any[] = []
   let skippedDuplicates = 0
   let autoNamed = 0
-  // AUDIT FIX: global duplicate check (was per-owner, allowed same URL for admin+z4x)
-  const existing = await Firebase.find().lean() as any[]
+  // PER-USER: duplicate per-owner
+  const existing = await Firebase.find(ownerFilterFb(req)).lean() as any[]
   const existingNorms = new Set(existing.map((f:any)=> normalizeUrl(f.database_url)))
   const seenInBatch = new Set<string>()
   for (const raw of items) {
@@ -151,7 +151,7 @@ router.post('/bulk', async (req:any, res) => {
     const created=await Firebase.findOne({_id:id}).lean()
     out.push({...created, id})
   }
-  if(out.length){ _invalidateCache('global'); _invalidateCache(req.user.id) }
+  if(out.length){ _invalidateCache(isSuper(req)? 'global' : req.user.id) }
   res.status(201).json({ imported: out.length, skippedDuplicates, autoNamed, firebases: out })
 })
 
@@ -159,8 +159,8 @@ router.get('/check-duplicate', async (req:any, res)=>{
   const url = (req.query.url as string) || ''
   if(!url) return res.json({ duplicate:false })
   const norm = normalizeUrl(url)
-  // AUDIT FIX: duplicate check must be GLOBAL (same URL for different owners caused 2 hives for amitabh + device owner flip-flop + z4x 0 devices). Was per-owner before.
-  const existing = await Firebase.find().lean() as any[]
+  // PER-USER: check only own hives
+  const existing = await Firebase.find(ownerFilterFb(req)).lean() as any[]
   const dup = existing.find((f:any)=> normalizeUrl(f.database_url)===norm)
   res.json({ duplicate: !!dup, duplicateHive: dup ? {...dup, id:dup._id} : null, normalized: norm })
 })
@@ -201,8 +201,7 @@ router.post('/:id/cleanup', async (req:any, res)=>{
   if(threshold!==null && online < threshold){
     await Device.deleteMany({firebase_id:fb._id})
     await Firebase.deleteOne({_id:fb._id})
-    _invalidateCache('global')
-    _invalidateCache(req.user.id)
+    _invalidateCache(isSuper(req)? 'global' : req.user.id)
     return res.json({ ok:true, deletedHive:true, online, total, threshold, message: `Hive deleted — had ${online} online < ${threshold}` })
   }
   const del = await Device.deleteMany({firebase_id:fb._id, status:{$ne:'online'}})

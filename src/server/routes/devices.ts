@@ -10,8 +10,8 @@ function isSuper(req:any){ return req.user?.is_super===1 }
 router.get('/', async (req:any, res) => {
   const { firebase_id, status, q } = req.query as any
   const filter:any={}
-  // AUDIT FIX: devices shared via hives — all see all (was per-owner, caused Windows 0 online for z4x while admin had 26). Hive write still per-owner.
-  // if(!isSuper(req)) filter.owner_id=req.user.id // disabled for shared view
+  // PER-USER: har user ka apna device dikhega (super sab dekhega)
+  if(!isSuper(req)) filter.owner_id=req.user.id
   if (firebase_id) filter.firebase_id = firebase_id
   if (status) filter.status = status
   if (q) filter.$or=[{name:{$regex:q, $options:'i'}}, {model:{$regex:q, $options:'i'}}]
