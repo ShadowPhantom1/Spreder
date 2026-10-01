@@ -1,48 +1,62 @@
 import 'dotenv/config'
 import { config } from '../config/index.js'
-import mongoose from 'mongoose'
-import { getModels } from './mongo.js'
 
 export let useMongo = true
+let User:any, Firebase:any, Device:any, Campaign:any, CampaignMessage:any, QueueItem:any, Setting:any, Session:any, DeviceDailyStat:any
 
-if(!config.MONGODB_URI){
-  console.error('[DB] MONGODB_URI required — fully Mongo mode, exiting')
-  process.exit(1)
+// DATABASE_TYPE: mongo | local — run.py decides
+const dbType = (process.env.DATABASE_TYPE || (config.MONGODB_URI ? 'mongo' : 'local')).toLowerCase()
+if (dbType === 'local') {
+  const { getLocalModels, initLocalDB } = await import('./local.js')
+  await initLocalDB()
+  const m = getLocalModels()
+  User=m.User; Firebase=m.Firebase; Device=m.Device; Campaign=m.Campaign; CampaignMessage=m.CampaignMessage; QueueItem=m.QueueItem; Setting=m.Setting; Session=m.Session; DeviceDailyStat=m.DeviceDailyStat
+  useMongo = false
+  console.log('[DB] LOCAL SQLite connected — ./data/local.db (VPS offline ok, fast)')
+} else {
+  if(!config.MONGODB_URI){
+    console.error('[DB] DATABASE_TYPE=mongo but MONGODB_URI missing — set via run.py option 1 or .env'); process.exit(1)
+  }
+  const mongoose = (await import('mongoose')).default
+  const { getModels } = await import('./mongo.js')
+  await mongoose.connect(config.MONGODB_URI, {
+    maxPoolSize: 20,
+    minPoolSize: 5,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 20000,
+    heartbeatFrequencyMS: 10000,
+    retryWrites: true,
+  } as any)
+  useMongo = true
+  console.log('[DB] Mongo connected — FULLY Mongo (ALL DATA) | pool 20')
+  const m = getModels()
+  User=m.User; Firebase=m.Firebase; Device=m.Device; Campaign=m.Campaign; CampaignMessage=m.CampaignMessage; QueueItem=m.QueueItem; Setting=m.Setting; Session=m.Session; DeviceDailyStat=m.DeviceDailyStat
 }
-
-await mongoose.connect(config.MONGODB_URI, {
-  maxPoolSize: 20,
-  minPoolSize: 5,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 20000,
-  heartbeatFrequencyMS: 10000,
-  retryWrites: true,
-} as any)
-useMongo = true
-console.log('[DB] Mongo connected — FULLY Mongo (ALL DATA) | pool 20')
-
-const {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session, DeviceDailyStat} = getModels()
 export {User, Firebase, Device, Campaign, CampaignMessage, QueueItem, Setting, Session, DeviceDailyStat}
 
-Promise.all([
-  User.syncIndexes().catch(()=>{}),
-  Firebase.syncIndexes().catch(()=>{}),
-  Device.syncIndexes().catch(()=>{}),
-  Campaign.syncIndexes().catch(()=>{}),
-  CampaignMessage.syncIndexes().catch(()=>{}),
-  QueueItem.syncIndexes().catch(()=>{}),
-  Session.syncIndexes().catch(()=>{}),
-  DeviceDailyStat.syncIndexes().catch(()=>{}),
-]).then(()=> console.log('[DB] indexes synced')).catch(()=>{})
-// SPEED: additional indexes for hives stats (was slow 2.6s + 4.3s on 709 devices)
-try{
-  await Device.collection.createIndex({status:1})
-  await Device.collection.createIndex({firebase_id:1})
-  await Device.collection.createIndex({firebase_id:1, status:1})
-  await Device.collection.createIndex({last_seen:-1})
-  await DeviceDailyStat.collection.createIndex({date:1})
-  console.log('[DB] speed indexes ok')
-}catch{}
+if (useMongo) {
+  Promise.all([
+    User.syncIndexes().catch(()=>{}),
+    Firebase.syncIndexes().catch(()=>{}),
+    Device.syncIndexes().catch(()=>{}),
+    Campaign.syncIndexes().catch(()=>{}),
+    CampaignMessage.syncIndexes().catch(()=>{}),
+    QueueItem.syncIndexes().catch(()=>{}),
+    Session.syncIndexes().catch(()=>{}),
+    DeviceDailyStat.syncIndexes().catch(()=>{}),
+  ]).then(()=> console.log('[DB] indexes synced')).catch(()=>{})
+  // SPEED: additional indexes for hives stats (was slow 2.6s + 4.3s on 709 devices)
+  try{
+    await Device.collection.createIndex({status:1})
+    await Device.collection.createIndex({firebase_id:1})
+    await Device.collection.createIndex({firebase_id:1, status:1})
+    await Device.collection.createIndex({last_seen:-1})
+    await DeviceDailyStat.collection.createIndex({date:1})
+    console.log('[DB] speed indexes ok')
+  }catch{}
+} else {
+  console.log('[DB] Local SQLite — indexes via table creation')
+}
 
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'

@@ -15,11 +15,12 @@
     "build:render": "npx tsc -p tsconfig.server.json && vite build && node -e \"try{require('fs').cpSync('persist','dist',{recursive:true});console.log('copied persist->dist')}catch(e){console.log(e.message)}\"",
     "start": "node persist/src/server/index.js",
     "start:render": "node persist/src/server/index.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/test_all.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^9.6.0",
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
