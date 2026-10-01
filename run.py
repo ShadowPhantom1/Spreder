@@ -201,8 +201,55 @@ def launch():
         run("pm2 save", shell=True, check=False)
         cprint("✓ PM2 started. pm2 logs spreder | pm2 stop spreder", "g")
         return
+    # Background mode: if --bg in args or user wants always background + tunnel
+    bg = "--bg" in sys.argv or os.environ.get("RUN_BG")=="1"
+    if bg:
+        # background + tunnel + URL
+        import time as _time
+        (ROOT/"logs").mkdir(exist_ok=True)
+        cprint(f"\n🚀 Starting in BACKGROUND (always) + tunnel...", "g")
+        # server bg
+        log_path=ROOT/"logs"/"app.log"
+        with open(log_path,"ab") as lf:
+            proc=subprocess.Popen(cmd, cwd=ROOT, env=env_run, stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+        cprint(f"✓ Server PID {proc.pid} → logs/app.log", "g")
+        _time.sleep(3)
+        # quick health
+        try:
+            import urllib.request
+            urllib.request.urlopen(f"http://localhost:{port}/api/health", timeout=3).read()
+            cprint(f"✅ http://localhost:{port} LIVE", "g")
+        except: cprint(f"⚠ http://localhost:{port} not yet, check logs/app.log", "y")
+        # tunnel bg
+        try:
+            cf=ROOT/"cloudflared"
+            if not cf.exists():
+                cprint("Downloading cloudflared...", "dim")
+                subprocess.run("curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared && chmod +x cloudflared", shell=True, cwd=ROOT)
+            tlog=ROOT/"logs"/"tunnel.log"
+            # kill old
+            subprocess.run("pkill -f cloudflared 2>/dev/null; sleep 1", shell=True)
+            with open(tlog,"ab") as tf:
+                subprocess.Popen([str(cf),"tunnel","--url",f"http://localhost:{port}"], cwd=ROOT, stdout=tf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+            cprint(f"✓ Tunnel starting → logs/tunnel.log", "g")
+            for i in range(8):
+                _time.sleep(1)
+                if tlog.exists():
+                    txt=tlog.read_text()
+                    import re
+                    m=re.search(r"https://[^\s]+trycloudflare\.com", txt)
+                    if m:
+                        url=m.group(0)
+                        cprint(f"\n🌐 TUNNEL URL (khi se bhi open): {url}", "c")
+                        cprint(f"   VPS URL: http://{priv}:{port} (LAN) + http://{pub}:{port} (public, if FW open)", "dim")
+                        break
+            else:
+                cprint(f"⚠ Tunnel URL not yet, cat logs/tunnel.log", "y")
+        except Exception as e: cprint(f"Tunnel fail: {e}", "r")
+        cprint(f"\n✅ Background me hamesha chalega — logs: tail -f logs/app.log | pkill -f \"tsx src/server\" to stop", "g")
+        return
     try:
-        # stream logs
+        # foreground stream logs
         proc=subprocess.Popen(cmd, cwd=ROOT, env=env_run)
         cprint(f"PID {proc.pid} — Press Ctrl+C to stop", "dim")
         proc.wait()
