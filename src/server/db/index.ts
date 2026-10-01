@@ -77,18 +77,13 @@ if (!adminExists) {
     console.log(`[DB] Seeded super admin Mongo: ${config.ADMIN_USER}`)
   }
 } else {
-  // exists with correct username — ensure password matches env (if env pass changed, update hash) and only one super
-  const hash = bcrypt.hashSync(config.ADMIN_PASS, 10)
-  // Only update password if it doesn't match (compare sync would be needed, but we just update to env hash for strict)
-  // To avoid rehash every restart, check if count of supers >1 then dedup, otherwise just ensure active
+  // exists with correct username — ensure active and only one super (do NOT overwrite password every boot — was overwriting manual reset)
   if(adminExists.is_super!==1){
     await User.updateOne({username: config.ADMIN_USER}, {$set:{is_super:1, is_active:1}})
     console.log(`[DB] Upgraded to super admin: ${config.ADMIN_USER}`)
+  } else {
+    await User.updateOne({_id: adminExists._id}, {$set:{is_active:1}})
   }
-  // If password in env changed, update it (so old admin pass becomes shadow phantom)
-  // We always sync password to env on boot for super
-  await User.updateOne({_id: adminExists._id}, {$set:{password_hash: hash, is_active:1}})
-  console.log(`[DB] Synced super password to env for ${config.ADMIN_USER}`)
   if(existingSupers.length>1){
     for(const dup of existingSupers.filter((u:any)=> String(u._id)!==String(adminExists._id))){
       await User.deleteOne({_id: dup._id})
