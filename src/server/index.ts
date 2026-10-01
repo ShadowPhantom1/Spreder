@@ -54,6 +54,25 @@ function getTodayDateIST(){
 }
 let _statsCacheMap=new Map<string,{data:any, ts:number}>()
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'BHNSTOCK SMS SPREADER 3D WEB', theme: 'Brand New Day', time: new Date().toISOString() }))
+app.get('/api/system/ip', async (req, res) => {
+  try{
+    const os=await import('os')
+    const nets=(os.default||os).networkInterfaces()
+    let ips:string[]=[]
+    for(const name of Object.keys(nets)){
+      for(const net of (nets as any)[name] || []){
+        if(net.family==='IPv4' && !net.internal) ips.push(net.address)
+      }
+    }
+    const host=req.get('host')||''
+    const forwarded=(req.headers['x-forwarded-for'] as string)||''
+    // VPS IP from env or detected
+    const vpsIp=process.env.PUBLIC_IP || ips[0] || '127.0.0.1'
+    const port=config.PORT
+    const proto=(req.headers['x-forwarded-proto'] as string) || req.protocol || 'http'
+    res.json({ ok:true, host, vpsIp, publicIp: forwarded.split(',')[0]||vpsIp, ips, port, url:`${proto}://${host}`, lanUrl:`http://${vpsIp}:${port}`, hostHeader: host })
+  }catch(e:any){ res.json({ok:true, host:req.get('host'), port: config.PORT, error:e.message}) }
+})
 
 app.get('/api/stats', async (req:any, res) => {
   // AUDIT FIX: devices/firebases are SHARED (all see same hives, fixes Windows 0 while hive has 26). Campaigns stay per-owner.

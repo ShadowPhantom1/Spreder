@@ -64,8 +64,25 @@ export default function Dashboard(){
     load()
   }
 
+  const [sysIp,setSysIp]=useState<any>(null)
+  useEffect(()=>{ fetch('/api/system/ip').then(r=>r.json()).then(setSysIp).catch(()=>{}) },[])
   return (
     <div className="space-y-6">
+      {/* VPS IP:PORT — show as soon as launched */}
+      <div className="rounded-[16px] bg-gradient-to-r from-[#00D9FF]/20 via-[#0066CC]/15 to-[#00D9FF]/20 border border-[#00D9FF]/30 p-3 flex flex-wrap items-center justify-between gap-3 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <span className="w-8 h-8 rounded-full bg-[#00D9FF] grid place-items-center animate-pulse">🌐</span>
+          <div>
+            <div className="text-[11px] font-black tracking-[0.16em] text-[#00D9FF]">YOUR SYSTEM — IP:PORT (LAUCHED ON VPS)</div>
+            <div className="text-sm font-mono font-bold text-white">{sysIp?.host || (typeof window!=='undefined'? window.location.host : '—')} <span className="text-white/40">•</span> <span className="text-[#00D9FF]">{sysIp?.lanUrl || ''}</span> <span className="text-white/30 text-xs">← open anywhere</span></div>
+            <div className="text-[11px] font-mono text-white/50">VPS IP: {sysIp?.vpsIp || '—'} • Port: {sysIp?.port || 3000} • Host: {sysIp?.host || '—'}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <a href={sysIp?.lanUrl || `http://${sysIp?.host||''}`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-full bg-[#00D9FF] text-[#0A1628] text-xs font-black hover:bg-[#00BFFF] transition">OPEN →</a>
+          <button onClick={()=> navigator.clipboard.writeText(sysIp?.lanUrl || window.location.href)} className="px-4 py-2 rounded-full bg-white/10 border border-white/20 text-xs font-bold hover:bg-white/15">COPY</button>
+        </div>
+      </div>
       {/* Hero — PHONK AURA 3D */}
       <div className="relative overflow-hidden rounded-[28px] comic-border phonk-glow bg-gradient-to-br from-[#0F2340] via-[#1A0A2E] to-[#0A1628] p-6 lg:p-8">
         <div className="phonk-aura" />

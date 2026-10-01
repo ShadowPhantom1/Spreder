@@ -12,6 +12,26 @@ const nav = [
   { to: '/docs', label: 'Docs', icon: BookOpen, sub: 'Single Source', img: '/icons/icon-docs.png' },
 ]
 
+function IpPortBadge(){
+  const [info,setInfo]=useState<any>(null)
+  useEffect(()=>{
+    fetch('/api/system/ip').then(r=>r.json()).then(setInfo).catch(()=>{})
+    // also use current browser host as fallback
+    const h=window.location.host
+    if(!info) setInfo({host:h, lanUrl:`http://${h}`})
+  },[])
+  const host=info?.host || (typeof window!=='undefined'? window.location.host : '')
+  const vpsIp=info?.vpsIp || info?.publicIp
+  const display=host || (vpsIp? `${vpsIp}:${info?.port||3000}` : '—')
+  return (
+    <a href={info?.lanUrl || `http://${host}`} target="_blank" rel="noreferrer" className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#00D9FF]/15 border border-[#00D9FF]/30 hover:bg-[#00D9FF]/25 transition" title={info?.lanUrl || host}>
+      <span className="w-2 h-2 rounded-full bg-[#00D9FF] animate-pulse" />
+      <span className="text-xs font-mono font-bold text-[#00D9FF]">{display}</span>
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 font-bold tracking-widest">IP:PORT</span>
+    </a>
+  )
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [stats, setStats] = useState<any>(null)
@@ -73,6 +93,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
+            {/* VPS IP:port — show as soon as launched */}
+            <IpPortBadge />
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/10 backdrop-blur">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse" />
               <span className="text-xs font-mono text-white/70">{stats?.devices?.online ?? stats?.devices?.rechargeOnline ?? '—'} ONLINE</span>
