@@ -2,14 +2,14 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { authRequired, superRequired } from '../middleware/auth.js'
-import mongoose from 'mongoose'
+import { User } from '../db/index.js'
 
 const r = Router()
 r.use(authRequired, superRequired)
 
 r.get('/users', async (_req,res)=>{
   try{
-    const User=mongoose.model('User')
+    // User from db/index
     const docs=await User.find().sort({created_at:-1}).lean() as any
     const users=docs.map((d:any)=>({ ...d, id:d._id, _id:d._id }))
     const enriched = users.map((u:any)=> ({...u, devices: 0, campaigns: 0, session: null}))
@@ -21,7 +21,7 @@ r.post('/users', async (req,res)=>{
   const { username, password, per_sim_limit=100, max_devices=100, expires_at } = req.body
   if(!username || !password) return res.status(400).json({error:'username/password required'})
   if(String(password).length < 8) return res.status(400).json({error:'password min 8 chars'})
-  const User=mongoose.model('User')
+  // User from db/index
   const exists=await User.findOne({username}).lean()
   if(exists) return res.status(400).json({error:'exists'})
   const id=randomUUID()
@@ -33,7 +33,7 @@ r.post('/users', async (req,res)=>{
 
 r.put('/users/:id', async (req,res)=>{
   const { per_sim_limit, max_devices, expires_at } = req.body
-  const User=mongoose.model('User')
+  // User from db/index
   const u=await User.findOne({_id:req.params.id}).lean() as any
   if(!u) return res.status(404).json({error:'not found'})
   const upd:any={}
@@ -45,7 +45,7 @@ r.put('/users/:id', async (req,res)=>{
 })
 
 r.post('/users/:id/disable', async (req,res)=>{
-  const User=mongoose.model('User')
+  // User from db/index
   await User.updateOne({_id:req.params.id}, {$set:{is_active:0}})
   const {Session} = await import('../db/index.js')
   await Session.deleteOne({_id:req.params.id} as any).catch(()=>{})
@@ -53,7 +53,7 @@ r.post('/users/:id/disable', async (req,res)=>{
   res.json({ok:true})
 })
 r.post('/users/:id/enable', async (req,res)=>{
-  const User=mongoose.model('User')
+  // User from db/index
   await User.updateOne({_id:req.params.id}, {$set:{is_active:1}})
   res.json({ok:true})
 })
@@ -64,7 +64,7 @@ r.post('/users/:id/kick', async (req,res)=>{
   res.json({ok:true})
 })
 r.post('/users/:id/reset-lock', async (req,res)=>{
-  const User=mongoose.model('User')
+  // User from db/index
   await User.updateOne({_id:req.params.id}, {$set:{allowed_device:null}})
   const {Session} = await import('../db/index.js')
   await Session.deleteOne({_id:req.params.id} as any).catch(()=>{})
@@ -73,7 +73,7 @@ r.post('/users/:id/reset-lock', async (req,res)=>{
 })
 r.delete('/users/:id', async (req,res)=>{
   const id=req.params.id
-  const User=mongoose.model('User')
+  // User from db/index
   const u=await User.findOne({_id:id}).lean() as any
   if(u?.is_super===1) return res.status(403).json({error:'cannot delete super'})
   await User.deleteOne({_id:id})

@@ -1,20 +1,17 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { Session } from '../db/index.js'
+import { Session, User } from '../db/index.js'
 import { config } from '../config/index.js'
-import mongoose from 'mongoose'
 
 const router = Router()
 
 async function getUserByUsername(username:string){
-  const User=mongoose.model('User')
   const d=await User.findOne({username}).lean() as any
   if(d) return {...d, id:d._id}
   return null
 }
 async function getUserById(id:string){
-  const User=mongoose.model('User')
   const d=await User.findOne({_id:id}).lean() as any
   if(d) return {...d, id:d._id}
   return null

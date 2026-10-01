@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config/index.js'
-import mongoose from 'mongoose'
+import { User } from '../db/index.js'
 
 export interface AuthedRequest extends Request {
   user?: { id: string; username: string; role: string; is_super?: number }
@@ -23,7 +23,7 @@ export async function authRequired(req: AuthedRequest, res: Response, next: Next
     const cacheKey = payload.id
     let u:any = _userCache.get(cacheKey)?.u
     if(!u || Date.now() > (_userCache.get(cacheKey)?.exp||0)){
-      const User=mongoose.model('User')
+      // User from db/index
       const d=await User.findOne({_id:payload.id}).lean() as any
       if(d) u={...d, id:d._id}
       if(u) _userCache.set(cacheKey,{u, exp:Date.now()+10000})
