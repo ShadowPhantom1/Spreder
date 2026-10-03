@@ -342,13 +342,12 @@ export async function processCampaign(campaignId: string) {
     }
     console.log(`[Queue] loop tick ${campaignId} pending check`)
 
-    const pending = await QueueItem.aggregate([
-      {$match:{campaign_id:campaignId, status:'queued'}},
-      {$lookup:{from:'campaign_messages', localField:'message_id', foreignField:'_id', as:'msg'}},
-      {$unwind:'$msg'},
-      {$limit: batchSize},
-      {$project:{qid:'$_id', msg:'$msg'}}
-    ]) as any[]
+    // FIX(local): don't use $lookup aggregate on SQLite — do 2 queries (works on both mongo & local)
+    const queueRows = await QueueItem.find({campaign_id:campaignId, status:'queued'}).limit(batchSize).lean() as any[]
+    const msgIds = queueRows.map((q:any)=> q.message_id)
+    const msgs = msgIds.length ? await CampaignMessage.find({_id: {$in: msgIds}}).lean() as any[] : []
+    const msgMap = new Map(msgs.map((m:any)=> [String(m._id), m]))
+    const pending = queueRows.map((q:any)=> ({qid:q._id, msg: msgMap.get(String(q.message_id))})).filter((p:any)=> p.msg)
     // pending is [{qid, msg}]
     const flat = pending.map((p:any)=> ({qid:p.qid, ...p.msg, _id:p.msg._id}))
     console.log(`[Queue] found ${flat.length} pending for ${campaignId}`)
