@@ -504,20 +504,25 @@ function wrapCollection(col: LocalCollection){
             _filter: filter,
             _sort: null as any,
             _limit: null as any,
+            _skip: 0 as number,
             sort(s:any){ this._sort=s; return this },
             limit(n:number){ this._limit=n; return this },
+            skip(n:number){ this._skip=n; return this },
             lean(){ return this },
             exec: async ()=>{
               let rows= (col as any).allRows().filter((d:any)=> matches(d, filter))
               if (q._sort) {
-                const [field, dir]=Object.entries(q._sort as any)[0] as any
+                const entries = Object.entries(q._sort as any)
                 rows.sort((a:any,b:any)=>{
-                  const av=a[field]||''; const bv=b[field]||''
-                  if (av < bv) return dir===-1?1:-1
-                  if (av > bv) return dir===-1?-1:1
+                  for(const [field, dir] of entries){
+                    const av=a[field]||''; const bv=b[field]||''
+                    if (av < bv) return (dir as any)===-1?1:-1
+                    if (av > bv) return (dir as any)===-1?-1:1
+                  }
                   return 0
                 })
               }
+              if (q._skip) rows=rows.slice(q._skip)
               if (q._limit!==null) rows=rows.slice(0,q._limit)
               return rows.map(rowToDoc)
             },
