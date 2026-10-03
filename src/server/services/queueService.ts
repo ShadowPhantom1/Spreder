@@ -158,12 +158,18 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
   if(cached && Date.now()-cached.ts < 3000) {
     return cached.devices
   }
-  const staleCutoff = new Date(Date.now() - 5*60*1000).toISOString()
+  // FIX: only ONLINE + permission (has_recharge!=0, null means allowed) — stale 15min, not 5min (was going 81->0 in 5min if poller slow)
+  const staleCutoff = new Date(Date.now() - 15*60*1000).toISOString()
   const baseOwnerFilter:any = ownerId ? {owner_id: ownerId} : {}
-  // STRICT: only 'online' (busy means already sending, not available for new sms) + has_recharge=1 (recharge check)
-  let rows = await Device.find({status:'online', has_recharge:1, last_seen: {$gte: staleCutoff}, ...baseOwnerFilter}).sort({last_seen:-1}).lean() as any[]
+  // ONLINE + permission: has_recharge 1 or null/undefined (new devices) = allowed; 0 = blocked
+  let rows = await Device.find({status:'online', has_recharge: {$ne: 0}, last_seen: {$gte: staleCutoff}, ...baseOwnerFilter}).sort({last_seen:-1}).lean() as any[]
   if(rows.length===0){
-    rows = await Device.find({status:'online', has_recharge:1, ...baseOwnerFilter}).sort({last_seen:-1}).limit(100).lean() as any[]
+    // fallback: ignore last_seen, keep permission check
+    rows = await Device.find({status:'online', has_recharge: {$ne: 0}, ...baseOwnerFilter}).sort({last_seen:-1}).limit(200).lean() as any[]
+  }
+  if(rows.length===0){
+    // last fallback: even busy with permission (was strict online only)
+    rows = await Device.find({status: {$in: ['online','busy']}, has_recharge: {$ne: 0}, ...baseOwnerFilter}).sort({last_seen:-1}).limit(100).lean() as any[]
   }
   rows = rows.map((r:any)=> ({...r, id:r._id}))
   const byHive = new Map<string, any[]>()
@@ -194,11 +200,11 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
   const checkRecharge = (getSetting('check_recharge')||'true') !== 'false'
   if(checkRecharge){
     rows = rows.filter(d=> {
-      if(d.has_recharge===0) return false
+      if(d.has_recharge===0) return false // null/undefined = allowed
       if(d.sim_count===2 && d.sim1_recharge===0 && d.sim2_recharge===0) return false
       return true
     })
-  }
+  } // FIX: null has_recharge means allowed (new device), only 0 is blocked
   if(isDailyLimitEnabled()){
     // FIX: batch counts already cached via _deviceTodayCache
     const filtered:any[]=[]
@@ -254,7 +260,7 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
   rows = perSlotRows
   // no busy fallback — only online that can send (busy already sending, skip)
   if (rows.length === 0) {
-    let busyFilter:any={status:'online', has_recharge:1}
+    let busyFilter:any={status:'online', has_recharge: {$ne: 0}}
     if(ownerId) busyFilter.owner_id=ownerId
     let r2 = await Device.find(busyFilter).sort({last_seen:-1}).limit(5).lean() as any[]
     r2=r2.map((r:any)=>({...r, id:r._id}))
