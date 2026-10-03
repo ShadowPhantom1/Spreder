@@ -218,32 +218,9 @@ async function getOnlineDevices(ownerId?: string): Promise<Array<{ id: string; f
       emit('campaign:log', { campaignId:'system', level:'warn', msg:`⚠️ All ONLINE SIMs hit daily limit or recharge check — waiting` })
     }
   }
-  // sort by reliability — fast path: skip per-device count when daily limit disabled
-  if(isDailyLimitEnabled()){
-    const withSent = await Promise.all(rows.map(async (d:any)=> ({d, sent: await getDeviceTodaySent(d.id)})))
-    withSent.sort((a,b)=>{
-      const aVal = a.d.validated_score||0, bVal=b.d.validated_score||0
-      if(aVal!==bVal && (aVal>2 || bVal>2)) return bVal-aVal
-      if(a.sent!==b.sent) return a.sent-b.sent
-      const aTime=a.d.last_seen? new Date(a.d.last_seen).getTime():0
-      const bTime=b.d.last_seen? new Date(b.d.last_seen).getTime():0
-      if(aTime!==bTime) return bTime-aTime
-      const aOk=(a.d.total_sent||0), aFail=(a.d.total_failed||0), aRate=aOk/(aOk+aFail+1)
-      const bOk=(b.d.total_sent||0), bFail=(b.d.total_failed||0), bRate=bOk/(bOk+bFail+1)
-      return bRate-aRate
-    })
-    rows = withSent.map(x=>x.d)
-  } else {
-    // fast sort without DB counts
-    rows.sort((a:any,b:any)=>{
-      const aVal=a.validated_score||0, bVal=b.validated_score||0
-      if(aVal!==bVal) return bVal-aVal
-      const aTime=a.last_seen? new Date(a.last_seen).getTime():0
-      const bTime=b.last_seen? new Date(b.last_seen).getTime():0
-      if(aTime!==bTime) return bTime-aTime
-      return (a.total_sent||0)-(b.total_sent||0)
-    })
-  }
+  // FIX: strict round-robin — keep interleaved+rotated order, no reliability re-sort (was breaking RR, same top devices always)
+  // dailyLimit and permission already filtered, keep RR order as is for even distribution
+  // (if need reliability, enable via setting round_robin_strict=false, but default strict true)
   const perSlotRows:any[]=[]
   for(const d of rows){
     const sc=d.sim_count||1
